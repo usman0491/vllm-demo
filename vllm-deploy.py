@@ -38,7 +38,7 @@ class VLLMDeployment:
         self.nginx = VLLMConfig.bind()
 
     async def __call__(self, request):
-	    return JSONResponse({"message": "Welcome to the Ray Serve vLLM Inference!"})
+	    return JSONResponse({"message": "Hi,\nWelcome to the Ray Serve vLLM Inference!"})
 
 
 
