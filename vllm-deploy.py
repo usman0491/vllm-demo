@@ -5,6 +5,7 @@ import os
 
 # These imports are used only for type hints:
 from typing import Dict
+import requests
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
