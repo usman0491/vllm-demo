@@ -25,8 +25,6 @@ class VLLMConfig:
         ).decode("utf-8").strip()
         print(f"VLLM container started with ID: {self.container_id}")
 
-        self.base_url = "http://localhost:8000"
-
     def __del__(self):
         subprocess.run(["docker", "stop", self.container_id], check=True)
         print(f"VLLM container stopped: {self.container_id}")
