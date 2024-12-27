@@ -1,5 +1,6 @@
 from ray import serve
 from ray.serve.handle import DeploymentHandle
+import subprocess
 
 # These imports are used only for type hints:
 from typing import Dict
@@ -16,7 +17,7 @@ class NgnixDeployment:
 	]).decode("utf-8").strip()
 	print(f"Nginx container started with ID: {self.container_id}")
     def __del__(self):
-	subprocess.run(["docker", "stop", self.container_id], check=True)
+	subprocess.run(["docker", "stop", self.container_id], check=True)h
 	print(f"Nginx container stopped: {self.container_id}")
 
     async def __call__(self, request):
@@ -31,7 +32,5 @@ class RootRouter:
 	return {"message": "Welcome to the Ray Serve Nginx App!"}
 
 
-
-app = RootRouter.bind()
 
 deployment_graph = RootRouter.bind()
