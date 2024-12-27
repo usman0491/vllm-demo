@@ -5,23 +5,26 @@ import subprocess
 # These imports are used only for type hints:
 from typing import Dict
 from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 @serve.deployment
-class NgnixDeployment:
+class NginxDeployment:
     def __init__(self):
-    self.container_id = subprocess.check_output(
-	[
-	    "docker", "run", "-d", "--rm",
-	    "-p", "80:80",
-	    "nginx:laster"
-	]).decode("utf-8").strip()
-	print(f"Nginx container started with ID: {self.container_id}")
+        self.container_id = subprocess.check_output(
+            [
+                "docker", "run", "-d", "--rm",
+                "-p", "80:80",
+                "nginx:latest"
+            ]
+        ).decode("utf-8").strip()
+        print(f"Nginx container started with ID: {self.container_id}")
+
     def __del__(self):
-	subprocess.run(["docker", "stop", self.container_id], check=True)h
-	print(f"Nginx container stopped: {self.container_id}")
+        subprocess.run(["docker", "stop", self.container_id], check=True)
+        print(f"Nginx container stopped: {self.container_id}")
 
     async def __call__(self, request):
-	return {"status": "Nginx container is running."}
+	    return JSONResponse({"status": "Nginx container is running."})
 
 @serve.deployment
 class RootRouter:
@@ -29,7 +32,7 @@ class RootRouter:
         self.nginx = NginxDeployment.bind()
 
     async def __call__(self, request):
-	return {"message": "Welcome to the Ray Serve Nginx App!"}
+	    return JSONResponse({"message": "Welcome to the Ray Serve Nginx App!"})
 
 
 
