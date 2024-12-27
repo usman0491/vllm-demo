@@ -5,12 +5,11 @@ import os
 
 # These imports are used only for type hints:
 from typing import Dict
-import requests
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 @serve.deployment
-class VLLMDeployment:
+class VLLMConfig:
     def __init__(self):
         self.container_id = subprocess.check_output(
             [
@@ -25,31 +24,22 @@ class VLLMDeployment:
             ]
         ).decode("utf-8").strip()
         print(f"VLLM container started with ID: {self.container_id}")
-        #self.base_url = "http://localhost:8000"
-        
+
     def __del__(self):
         subprocess.run(["docker", "stop", self.container_id], check=True)
         print(f"VLLM container stopped: {self.container_id}")
 
-    async def __call__(self, request: Request):
-        sub_path = request.url.path[len("/vllm"):]
-        target_url = f"http://localhost:8000/vllm{sub_path}"
+    async def __call__(self, request):
+	    return JSONResponse({"status": "VLLM container is running."})
 
-        try:
-            response = requests.request(
-                method=request.method,
-                url=target_url,
-                headers=request.headers,
-                data=await request.body(),
-                timeout=10,
-            )
+@serve.deployment
+class VLLMDeployment:
+    def __init__(self):
+        self.nginx = VLLMConfig.bind()
 
-            return Response(
-                content=response.content,
-                status_code=response.status_code,
-                headers=dict(response.headers),
-            )
+    async def __call__(self, request):
+	    return JSONResponse({"message": "Welcome to the Ray Serve vLLM Inference!"})
 
-        except requests.exceptions.RequestException as e:
-            return JSONResponse({"error": str(e)}, status_code=500)
+
+
 deployment_graph = VLLMDeployment.bind()
