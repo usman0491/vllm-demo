@@ -5,6 +5,8 @@ import os
 import requests
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+import logging
 
 app = FastAPI()
 
@@ -54,8 +56,21 @@ class VLLMDeployment:
         self.vllm_service = VLLMConfig.bind()
 
     async def __call__(self, request: Request):
-        payload = await request.json()
-        return await self.vllm_service.remote(payload)
+        # Debugging: Log incoming request
+        try:
+            payload = await request.json()
+            logging.info(f"Received payload: {payload}")
+        except Exception as e:
+            logging.error(f"Error parsing JSON: {e}")
+            return JSONResponse({"error": "Invalid or missing JSON payload"}, status_code=400)
+
+        # Forward the payload to the vLLM service
+        try:
+            result = await self.vllm_service.remote(payload)
+            return JSONResponse(result)
+        except Exception as e:
+            logging.error(f"Error in vLLM service call: {e}")
+            return JSONResponse({"error": "Internal server error"}, status_code=500)
 
 
 deployment_graph = VLLMDeployment.bind()
