@@ -29,7 +29,7 @@ class VLLMConfig:
         print(f"VLLM container stopped: {self.container_id}")
 
     async def __call__(self, request: Request):
-	    payload = await request.json()
+        payload = await request.json()  # Fixing indentation
         try:
             response = requests.post(
                 "http://localhost:8000/v1/completions",
