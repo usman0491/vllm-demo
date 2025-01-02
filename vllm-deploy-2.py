@@ -3,9 +3,10 @@ from ray.serve.handle import DeploymentHandle
 import subprocess
 import os
 import requests
-from typing import Dict
-from starlette.requests import Request
-from starlette.responses import JSONResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+app = FastAPI()
 
 @serve.deployment
 class VLLMConfig:
@@ -28,13 +29,16 @@ class VLLMConfig:
         subprocess.run(["docker", "stop", self.container_id], check=True)
         print(f"VLLM container stopped: {self.container_id}")
 
-    async def __call__(self, request: Request): 
+    @app.post("/vllm_completions")
+    async def get_vllm_completions(self, request: Request):
+        # Retrieve the JSON payload from the incoming request
         try:
             payload = await request.json()
         except Exception as e:
-            return JSONResponse({"error": "Invalid or missing JSON payload."}, status_code=400)
-            
+            return JSONResponse({"error": "Invalid JSON payload"}, status_code=400)
+
         try:
+            # Forward the request to the vLLM container running on localhost
             response = requests.post(
                 "http://localhost:8000/v1/completions",
                 json=payload,
