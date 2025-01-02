@@ -3,7 +3,6 @@ from ray.serve.handle import DeploymentHandle
 import subprocess
 import os
 import requests
-# These imports are used only for type hints:
 from typing import Dict
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -29,17 +28,26 @@ class VLLMConfig:
         subprocess.run(["docker", "stop", self.container_id], check=True)
         print(f"VLLM container stopped: {self.container_id}")
 
-    async def __call__(self, request):
-	    return JSONResponse({"status": "VLLM container is running."})
+    async def __call__(self, request: Request):
+	    payload = await request.json()
+        try:
+            response = requests.post(
+                "http://localhost:8000/v1/completions",
+                json=payload,
+                headers={"Authorization": f"Bearer {os.getenv('VLLM_API_KEY')}"}
+            )
+            return JSONResponse(response.json())
+        except requests.exceptions.RequestException as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
 
 @serve.deployment
 class VLLMDeployment:
     def __init__(self):
-        self.nginx = VLLMConfig.bind()
+        self.vllm_service = VLLMConfig.bind()
 
-    async def __call__(self, request):
-	    return JSONResponse({"message": "Hi,\nWelcome to the Ray Serve vLLM Inference!"})
-
+    async def __call__(self, request: Request):
+        payload = await request.json()
+        return await self.vllm_service.remote(payload)
 
 
 deployment_graph = VLLMDeployment.bind()
