@@ -7,6 +7,8 @@ from fastapi import FastAPI, Request
 from starlette.responses import JSONResponse, Response
 import httpx  # Use httpx for async HTTP requests
 
+app = FastAPI()
+
 @serve.deployment
 class VLLMConfig:
     def __init__(self):
@@ -29,7 +31,7 @@ class VLLMConfig:
         print(f"VLLM container stopped: {self.container_id}")
 
 @serve.deployment
-@serve.ingress(app := FastAPI())  # Initialize FastAPI app and bind with Ray Serve
+@serve.ingress(app)  # Initialize FastAPI app and bind with Ray Serve
 class VLLMDeployment:
     def __init__(self):
         self.vllm_service = VLLMConfig.bind()
@@ -55,14 +57,5 @@ class VLLMDeployment:
                 content={"error": f"An error occurred while forwarding the request: {exc}"}
             )
 
-    async def __call__(self, request: Request):
-        # Optional: Implement if you want a default handler
-        return JSONResponse({"message": "vLLM Deployment is running."})
-
 # Bind the deployment graph
 deployment_graph = VLLMDeployment.bind()
-
-# Optionally, define the deployment to be started when this script runs
-if __name__ == "__main__":
-    serve.start()
-    serve.run(deployment_graph)
