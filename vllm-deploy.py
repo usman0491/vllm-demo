@@ -37,7 +37,7 @@ class VLLMDeployment:
         self.vllm_service = VLLMConfig.bind()
         self.client = httpx.AsyncClient()  # Initialize HTTP client
 
-    @app.post("/v1/chat/completions")
+    @app.post("/v1/completions")
     async def create_chat_completion(self, request: Request):
         """Forward the request to the vLLM container's endpoint."""
         try:
@@ -45,7 +45,7 @@ class VLLMDeployment:
             payload = await request.json()
 
             # Forward the request to the vLLM container
-            response = await self.client.post("http://localhost:8000/v1/chat/completions", json=payload)
+            response = await self.client.post("http://localhost:8000/v1/completions", json=payload)
 
             # Return the response from vLLM container directly
             return Response(content=response.content, status_code=response.status_code, media_type=response.headers.get('Content-Type', 'application/json'))
