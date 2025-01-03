@@ -1,11 +1,10 @@
+import os
+import subprocess
 from ray import serve
 from ray.serve.handle import DeploymentHandle
-import subprocess
-import os
-import requests
-from typing import Dict
-from starlette.requests import Request
-from starlette.responses import JSONResponse
+from fastapi import Request
+from starlette.responses import JSONResponse, Response
+import httpx
 
 @serve.deployment
 class VLLMConfig:
@@ -29,29 +28,35 @@ class VLLMConfig:
         print(f"VLLM container stopped: {self.container_id}")
 
     async def __call__(self, request: Request): 
+        
+
+@serve.deployment
+@serve.ingress(app := FastAPI())
+class VLLMDeployment:
+    def __init__(self):
+        self.vllm_service = VLLMConfig.bind()
+        self.client = httpx.AsyncClient()
+
+    @app.post("/v1/completions")
+    async def create_completion(self, request: Request):
         try:
             payload = await request.json()
-        except Exception as e:
-            return JSONResponse({"error": "Invalid or missing JSON payload."}, status_code=400)
-            
-        try:
-            response = requests.post(
+
+            response = await self.client.post(
                 "http://localhost:8000/v1/completions",
                 json=payload,
                 headers={"Authorization": f"Bearer {os.getenv('VLLM_API_KEY')}"}
             )
-            return JSONResponse(response.json())
-        except requests.exceptions.RequestException as e:
-            return JSONResponse({"error": str(e)}, status_code=500)
 
-@serve.deployment
-class VLLMDeployment:
-    def __init__(self):
-        self.vllm_service = VLLMConfig.bind()
+            return Response(content=response.content, status_code=response.status_code, media_type=response.headers.get('Content-Type', 'application/json'))
+        except httpx.RequestError as exc:
+            return JSONResponse(
+                status_code=500,
+                content={"error": f"An error occurred while forwarding the request: {exc}"}
+            )
 
     async def __call__(self, request: Request):
-        payload = await request.json()
-        return await self.vllm_service.remote(payload)
+        return JSONResponse({"message": "vLLM Deployment is running."})
 
 
 deployment_graph = VLLMDeployment.bind()
