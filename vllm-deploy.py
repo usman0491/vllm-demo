@@ -34,11 +34,11 @@ class VLLMConfig:
 @serve.ingress(app)  # Initialize FastAPI app and bind with Ray Serve
 class VLLMDeployment:
     def __init__(self):
-        self.vllm_service = VLLMConfig.bind()
+#        self.vllm_service = VLLMConfig.bind()
         self.client = httpx.AsyncClient()  # Initialize HTTP client
 
     @app.post("/v1/completions")
-    async def create_chat_completion(self, request: Request):
+    async def create_completion(self, request: Request):
         """Forward the request to the vLLM container's endpoint."""
         try:
             # Read the incoming JSON payload
