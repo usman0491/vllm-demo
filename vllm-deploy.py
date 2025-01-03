@@ -1,10 +1,11 @@
 import os
 import subprocess
+
 from ray import serve
 from ray.serve.handle import DeploymentHandle
-from fastapi import Request
+from fastapi import FastAPI, Request
 from starlette.responses import JSONResponse, Response
-import httpx
+import httpx  # Use httpx for async HTTP requests
 
 @serve.deployment
 class VLLMConfig:
@@ -27,36 +28,41 @@ class VLLMConfig:
         subprocess.run(["docker", "stop", self.container_id], check=True)
         print(f"VLLM container stopped: {self.container_id}")
 
-    async def __call__(self, request: Request): 
-        
-
 @serve.deployment
-@serve.ingress(app := FastAPI())
+@serve.ingress(app := FastAPI())  # Initialize FastAPI app and bind with Ray Serve
 class VLLMDeployment:
     def __init__(self):
         self.vllm_service = VLLMConfig.bind()
-        self.client = httpx.AsyncClient()
+        self.client = httpx.AsyncClient()  # Initialize HTTP client
 
-    @app.post("/v1/completions")
-    async def create_completion(self, request: Request):
+    @app.post("/v1/chat/completions")
+    async def create_chat_completion(self, request: Request):
+        """Forward the request to the vLLM container's endpoint."""
         try:
+            # Read the incoming JSON payload
             payload = await request.json()
 
-            response = await self.client.post(
-                "http://localhost:8000/v1/completions",
-                json=payload,
-                headers={"Authorization": f"Bearer {os.getenv('VLLM_API_KEY')}"}
-            )
+            # Forward the request to the vLLM container
+            response = await self.client.post("http://localhost:8000/v1/chat/completions", json=payload)
 
+            # Return the response from vLLM container directly
             return Response(content=response.content, status_code=response.status_code, media_type=response.headers.get('Content-Type', 'application/json'))
+
         except httpx.RequestError as exc:
+            # Handle connection errors
             return JSONResponse(
                 status_code=500,
                 content={"error": f"An error occurred while forwarding the request: {exc}"}
             )
 
     async def __call__(self, request: Request):
+        # Optional: Implement if you want a default handler
         return JSONResponse({"message": "vLLM Deployment is running."})
 
-
+# Bind the deployment graph
 deployment_graph = VLLMDeployment.bind()
+
+# Optionally, define the deployment to be started when this script runs
+if __name__ == "__main__":
+    serve.start()
+    serve.run(deployment_graph)
