@@ -1,9 +1,8 @@
 import os
-
-from typing import Dict, Optional, List
 import logging
+from typing import Dict, Optional, List
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from starlette.requests import Request
 from starlette.responses import StreamingResponse, JSONResponse
 
@@ -21,6 +20,7 @@ from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
 from vllm.entrypoints.openai.serving_engine import LoRAModulePath
 from vllm.utils import FlexibleArgumentParser
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")
 
 app = FastAPI()
@@ -29,55 +29,93 @@ app = FastAPI()
 @serve.ingress(app)
 class VLLMDeployment:
     def __init__(self, engine_args: AsyncEngineArgs, response_role: str):
-        logger.info(f"Starting with engine args: {engine_args}")
-        self.openai_serving_chat = None
-        self.engine_args = engine_args
-        self.response_role = response_role
-        self.engine = AsyncLLMEngine.from_engine_args(engine_args)
+        try:
+            logger.info(f"Starting with engine args: {engine_args}")
+            self.openai_serving_chat = None
+            self.engine_args = engine_args
+            self.response_role = response_role
+            self.engine = AsyncLLMEngine.from_engine_args(engine_args)
+            logger.info(f"VLLMDeployment engine initialized successfully.")
+        except Exception as e:
+            logger.error(f"Failed to initialize VLLMDeployment engine: {e}", exc_info=True)
+            raise
+
 
     @app.post("/v1/completions")
     async def create_completion(self, request: ChatCompletionRequest, raw_request: Request):
-        if not self.openai_serving_chat:
-            model_config = await self.engine.get_model_config()
-            if self.engine_args.served_model_name is not None:
-                served_model_names = self.engine_args.served_model_name
+        try:
+            logger.info(f"Received completion request: {request}")
+            if not self.openai_serving_chat:
+                model_config = await self.engine.get_model_config()
+                if self.engine_args.served_model_name is not None:
+                    served_model_names = self.engine_args.served_model_name
+                else:
+                    served_model_names = [self.engine_args.model]
+                self.openai_serving_chat = OpenAIServingChat(
+                    self.engine,
+                    model_config,
+                    served_model_names=served_model_names,
+                    response_role=self.response_role,
+                )
+                logger.info(f"OpenAIServingChat instance initialized.")
+            
+            generator = await self.openai_serving_chat.create_completion(request, raw_request)
+
+            if isinstance(generator, ErrorResponse):
+                logger.warning(f"Error in completion generation: {generator}")
+                return JSONResponse(
+                    content=generator.model_dump(), status_code=generator.code
+                )
+            
+            if request.stream:
+                logger.info(f"Streaming response back to the client.")
+                return StreamingResponse(generator, media_type="text/event-stream")
             else:
-                served_model_names = [self.engine_args.model]
-            self.openai_serving_chat = OpenAIServingChat(
-                self.engine,
-                model_config,
-                served_model_names=served_model_names,
-                response_role=self.response_role,
-            )
-        logger.info(f"Request: {request}")
-        generator = await self.openai_serving_chat.create_completion(request, raw_request)
-        if isinstance(generator, ErrorResponse):
+                assert isinstance(generator, ChatCompletionResponse)
+                logger.info(f"Returning JSON response to the client.")
+                return JSONResponse(content=generator.model_dump())
+        except HTTPException as http_exc:
+            logger.error(f"HTTP exception encountered: {http_exc.detail}", exc_info=True)
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error in create_completion: {e}", exc_info=True)
             return JSONResponse(
-                content=generator.model_dump(), status_code=generator.code
-            )
-        if request.stream:
-            return StreamingResponse(generator, media_type="text/event-stream")
-        else:
-            assert isinstance(generator, ChatCompletionResponse)
-            return JSONResponse(content=generator.model_dump())
+                content={"error": "Internal server error", "details": str(e)}, 
+                status_code=500,
+                )
 
 def parse_vllm_args(cli_args: dict[str, str]):
-    parser = FlexibleArgumentParser(description="vLLM CLI")
-    parser = make_arg_parser(parser)
-    arg_strings = []
-    for key, value in cli_args.items():
-        arg_strings.append(f"--{key}={value}")
-    parsed_args = parser.parse_args(args=arg_strings)
-    return parsed_args
+    try:
+        logger.info(f"Parsing CLI arguments: {cli_args}")
+        parser = FlexibleArgumentParser(description="vLLM CLI")
+        parser = make_arg_parser(parser)
+        arg_strings = [f"--{key}={value}" for key, value in cli_args.items()]
+        parsed_args = parser.parse_args(args=arg_strings)
+        logger.info("CLI arguments parsed successfully.")
+        return parsed_args
+    except Exception as e:
+        logger.error(f"Failed to parse CLI arguments: {e}", exc_info=True)
+        raise
 
-def build_app(cli_args: dict[str, str]) -> serve.Application:
-    parsed_args = parse_vllm_args(cli_args)
-    engine_args = AsyncEngineArgs.from_cli_args(parsed_args)
-    engine_args.worker_use_ray = True
-    return VLLMDeployment.bind(engine_args, parsed_args.response_role)
+def build_app(cli_args: Dict[str, str]) -> serve.Application:
+    try:
+        logger.info(f"Building app with CLI arguments: {cli_args}")
+        parsed_args = parse_vllm_args(cli_args)
+        engine_args = AsyncEngineArgs.from_cli_args(parsed_args)
+        engine_args.worker_use_ray = True
+        logger.info("Application built successfully.")
+        return VLLMDeployment.bind(engine_args, parsed_args.response_role)
+    except Exception as e:
+        logger.error(f"Failed to build application: {e}", exc_info=True)
+        raise
 
-model = build_app({
-    "model": os.environ['MODEL_ID'],
-    "tensor-parallel-size": os.environ['TENSOR_PARALLELISM'],
-    "pipeline-parallel-size": os.environ['PIPELINE_PARALLELISM']
-})
+try:
+    model = build_app({
+        "model": os.environ.get('MODEL_ID', 'default-model-id'),
+        "tensor-parallel-size": os.environ.get('TENSOR_PARALLELISM', '1'),
+        "pipeline-parallel-size": os.environ.get('PIPELINE_PARALLELISM', '1'),
+    })
+    logger.info("Model deployment initialized successfully.")
+except Exception as e:
+    logger.critical(f"Model deployment failed: {e}", exc_info=True)
+    raise
