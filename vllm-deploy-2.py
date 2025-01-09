@@ -56,6 +56,10 @@ class VLLMDeployment:
                     model_config,
                     served_model_names=served_model_names,
                     response_role=self.response_role,
+                    lora_modules=[],  # Dummy value for LoRA modules
+                    prompt_adapters=None,  # Dummy value for prompt adapters
+                    request_logger=None,  # Dummy value for request logger
+                    chat_template=None,  # Dummy value for chat template
                 )
                 logger.info(f"OpenAIServingChat instance initialized.")
             
