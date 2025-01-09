@@ -42,7 +42,7 @@ class VLLMDeployment:
 
 
     @app.post("/v1/completions")
-    async def create_completion(self, request: ChatCompletionRequest, raw_request: Request):
+    async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
         try:
             logger.info(f"Received completion request: {request}")
             if not self.openai_serving_chat:
@@ -63,7 +63,7 @@ class VLLMDeployment:
                 )
                 logger.info(f"OpenAIServingChat instance initialized.")
             
-            generator = await self.openai_serving_chat.create_completion(request, raw_request)
+            generator = await self.openai_serving_chat.create_chat_completion(request, raw_request)
 
             if isinstance(generator, ErrorResponse):
                 logger.warning(f"Error in completion generation: {generator}")
@@ -82,7 +82,7 @@ class VLLMDeployment:
             logger.error(f"HTTP exception encountered: {http_exc.detail}", exc_info=True)
             raise
         except Exception as e:
-            logger.error(f"Unexpected error in create_completion: {e}", exc_info=True)
+            logger.error(f"Unexpected error in create_chat_completion: {e}", exc_info=True)
             return JSONResponse(
                 content={"error": "Internal server error", "details": str(e)}, 
                 status_code=500,
