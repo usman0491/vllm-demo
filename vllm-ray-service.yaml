@@ -1,0 +1,109 @@
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: vllm-demo-service
+  namespace: ray-system
+spec:
+  # serveConfigV2 takes a yaml multi-line scalar, which should be a Ray Serve multi-application config. See https://docs.ray.io/en/latest/serve/multi-app.html.
+  #             VLLM_API_KEY: genie-vllm-secure-key
+
+  serveConfigV2: |
+    applications:
+      - name: vllm_service
+        import_path: vllm-deploy-2:model
+        route_prefix: /
+        runtime_env:
+          env_vars:
+            RAY_LOG_TO_STDERR: "1"
+            RAY_SERVE_LOGGING_LEVEL: DEBUG
+            HUGGING_FACE_HUB_TOKEN: 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
+            MODEL_ID: "meta-llama/Meta-Llama-3-8B-Instruct"
+            TENSOR_PARALLELISM: "1"
+            PIPELINE_PARALLELISM: "1"
+          working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-deploy-2.zip"
+          pip: ["vllm==0.5.4", "typer==0.12.3", "rich==13.3.3"]
+        deployments:
+          - name: VLLMDeployment
+            num_replicas: 1
+            max_replicas_per_node: 1
+            ray_actor_options:
+                resources:
+                  head_node: 0
+  rayClusterConfig:
+    rayVersion: '2.9.0' # should match the Ray version in the image of the containers
+    ######################headGroupSpecs#################################
+    # Ray head pod template.
+    headGroupSpec:
+      # The `rayStartParams` are used to configure the `ray start` command.
+      # See https://github.com/ray-project/kuberay/blob/master/docs/guidance/rayStartParams.md for the default settings of `rayStartParams` in KubeRay.
+      # See https://docs.ray.io/en/latest/cluster/cli.html#ray-start for all available options in `rayStartParams`.
+      rayStartParams:
+        dashboard-host: '0.0.0.0'
+      #pod template
+      template:
+        spec:
+          containers:
+            - name: ray-head
+              image: rayproject/ray-ml:2.33.0.914af0-py311
+              resources:
+                limits:
+                  cpu: 1
+                  memory: 8Gi
+                requests:
+                  cpu: 1
+                  memory: 8Gi
+              ports:
+                - containerPort: 6379
+                  name: gcs-server
+                - containerPort: 8265 # Ray dashboard
+                  name: dashboard
+                - containerPort: 10001
+                  name: client
+                - containerPort: 8000
+                  name: serve
+              env:
+                - name: HUGGING_FACE_HUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: hf-secret
+                      key: hf_api_token
+    workerGroupSpecs:
+      # the pod replicas in this group typed worker
+      - replicas: 1
+        minReplicas: 0
+        maxReplicas: 1
+        # logical group name, for this called small-group, also can be functional
+        groupName: vllm-group
+        # The `rayStartParams` are used to configure the `ray start` command.
+        # See https://github.com/ray-project/kuberay/blob/master/docs/guidance/rayStartParams.md for the default settings of `rayStartParams` in KubeRay.
+        # See https://docs.ray.io/en/latest/cluster/cli.html#ray-start for all available options in `rayStartParams`.
+        rayStartParams: {}
+        #pod template
+        template:
+          spec:
+            containers:
+              - name: ray-worker # must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc'
+                image: rayproject/ray-ml:2.33.0.914af0-py311
+                env:
+                  - name: HUGGING_FACE_HUB_TOKEN
+                    valueFrom:
+                      secretKeyRef:
+                        name: hf-secret
+                        key: hf_api_token
+                lifecycle:
+                  preStop:
+                    exec:
+                      command: ["/bin/sh","-c","ray stop"]
+                resources:
+                  limits:
+                    cpu: "1"
+                    memory: "10Gi"
+                    nvidia.com/gpu: "1"
+                  requests:
+                    cpu: "1"
+                    memory: "8Gi"
+                    nvidia.com/gpu: "1"
+            tolerations:
+              - key: nvidia.com/gpu
+                operator: Exists
+                effect: NoSchedule
