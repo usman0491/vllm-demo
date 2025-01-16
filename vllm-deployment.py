@@ -34,8 +34,8 @@ class VLLMDeployment:
             self.openai_serving_chat = None
             self.engine_args = engine_args
             self.response_role = response_role
-            # self.engine = AsyncLLMEngine.from_engine_args(engine_args)
-            self.engine = None
+            self.engine = AsyncLLMEngine.from_engine_args(engine_args)
+            # self.engine = None
             logger.info(f"VLLMDeployment engine initialized successfully (engine is not yet created).")
         except Exception as e:
             logger.error(f"Failed to initialize VLLMDeployment: {e}", exc_info=True)
