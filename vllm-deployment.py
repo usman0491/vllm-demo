@@ -30,21 +30,40 @@ app = FastAPI()
 class VLLMDeployment:
     def __init__(self, engine_args: AsyncEngineArgs, response_role: str):
         try:
-            logger.info(f"Starting with engine args: {engine_args}")
+            logger.info(f"Initializing VLLMDeployment with engine args: {engine_args}")
             self.openai_serving_chat = None
             self.engine_args = engine_args
             self.response_role = response_role
-            self.engine = AsyncLLMEngine.from_engine_args(engine_args)
-            logger.info(f"VLLMDeployment engine initialized successfully.")
+            # self.engine = AsyncLLMEngine.from_engine_args(engine_args)
+            self.engine = None
+            logger.info(f"VLLMDeployment engine initialized successfully (engine is not yet created).")
         except Exception as e:
-            logger.error(f"Failed to initialize VLLMDeployment engine: {e}", exc_info=True)
+            logger.error(f"Failed to initialize VLLMDeployment: {e}", exc_info=True)
             raise
+
+    async def _initialize_engine(self):
+        """Lazy initialization of the AsyncLLMEngine."""
+        if not self.engine:
+            try:
+                logger.info("Initializing AsyncLLMEngine...")
+                self.engine = AsyncLLMEngine.from_engine_args(self.engine_args)
+                logger.info("AsyncLLMEngine initialized successfully.")
+            except Exception as e:
+                logger.error(f"Failed to initialize AsyncLLMEngine: {e}", exc_info=True)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Error initializing engine: {str(e)}"
+                )
 
 
     @app.post("/v1/completions")
     async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
         try:
             logger.info(f"Received completion request: {request}")
+
+            #Ensure the engine is initialized
+            await self._initialize_engine()
+            
             if not self.openai_serving_chat:
                 model_config = await self.engine.get_model_config()
                 if self.engine_args.served_model_name is not None:
