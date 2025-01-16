@@ -102,18 +102,16 @@ def parse_vllm_args(cli_args: dict[str, str]):
         raise
 
 def build_app(cli_args: Dict[str, str]) -> serve.Application:
-    while True:
-        print("This is an infinite loop")
-    # try:
-    #     logger.info(f"Building app with CLI arguments: {cli_args}")
-    #     parsed_args = parse_vllm_args(cli_args)
-    #     engine_args = AsyncEngineArgs.from_cli_args(parsed_args)
-    #     engine_args.worker_use_ray = True
-    #     logger.info("Application built successfully.")
-    #     return VLLMDeployment.bind(engine_args, parsed_args.response_role)
-    # except Exception as e:
-    #     logger.error(f"Failed to build application: {e}", exc_info=True)
-    #     raise
+    try:
+        logger.info(f"Building app with CLI arguments: {cli_args}")
+        parsed_args = parse_vllm_args(cli_args)
+        engine_args = AsyncEngineArgs.from_cli_args(parsed_args)
+        engine_args.worker_use_ray = True
+        logger.info("Application built successfully.")
+        return VLLMDeployment.bind(engine_args, parsed_args.response_role)
+    except Exception as e:
+        logger.error(f"Failed to build application: {e}", exc_info=True)
+        raise
 
 try:
     model = build_app({
