@@ -41,19 +41,19 @@ class VLLMDeployment:
             logger.error(f"Failed to initialize VLLMDeployment: {e}", exc_info=True)
             raise
 
-    async def _initialize_engine(self):
-        """Lazy initialization of the AsyncLLMEngine."""
-        if not self.engine:
-            try:
-                logger.info("Initializing AsyncLLMEngine...")
-                self.engine = AsyncLLMEngine.from_engine_args(self.engine_args)
-                logger.info("AsyncLLMEngine initialized successfully.")
-            except Exception as e:
-                logger.error(f"Failed to initialize AsyncLLMEngine: {e}", exc_info=True)
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Error initializing engine: {str(e)}"
-                )
+    # async def _initialize_engine(self):
+    #     """Lazy initialization of the AsyncLLMEngine."""
+    #     if not self.engine:
+    #         try:
+    #             logger.info("Initializing AsyncLLMEngine...")
+    #             self.engine = AsyncLLMEngine.from_engine_args(self.engine_args)
+    #             logger.info("AsyncLLMEngine initialized successfully.")
+    #         except Exception as e:
+    #             logger.error(f"Failed to initialize AsyncLLMEngine: {e}", exc_info=True)
+    #             raise HTTPException(
+    #                 status_code=500,
+    #                 detail=f"Error initializing engine: {str(e)}"
+    #             )
 
 
     @app.post("/v1/completions")
@@ -62,7 +62,7 @@ class VLLMDeployment:
             logger.info(f"Received completion request: {request}")
 
             #Ensure the engine is initialized
-            await self._initialize_engine()
+            # await self._initialize_engine()
             
             if not self.openai_serving_chat:
                 model_config = await self.engine.get_model_config()
