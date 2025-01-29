@@ -73,7 +73,8 @@ class VLLMDeployment:
             resources = ray.available_resources()
             if resources.get("nvidia.com/gpu", 0) == 0:
                 logger.info("No worker detected. Requesting worker node...")
-                request_resources({"CPU": 2, "nvidia.com/gpu": 1})
+                request_resources(
+                    bundles=[{"CPU": 2, "nvidia.com/gpu": 1}])
 
             #Ensure the engine is initialized
             await self._initialize_engine()
