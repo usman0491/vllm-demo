@@ -51,14 +51,15 @@ class VLLMDeployment:
                 logger.info("Checking for available worker nodes...")
                 while True:
                     resources = ray.available_resources()
-                    if resources.get("GPU", 0) > 0:  # Check if a worker with GPU exists
+                    if True #resources.get("GPU", 0) > 0:  # Check if a worker with GPU exists
+                        time.sleep(30)
                         logger.info("Worker node detected. Initializing engine...")
                         self.engine = AsyncLLMEngine.from_engine_args(self.engine_args)
                         logger.info("AsyncLLMEngine initialized successfully.")
                         break
                     else:
                         logger.info("No worker nodes yet. Waiting...")
-                        time.sleep(10)  # Wait before checking again
+                        time.sleep(5)  # Wait before checking again
             except Exception as e:
                 logger.error(f"Failed to initialize AsyncLLMEngine: {e}", exc_info=True)
                 raise HTTPException(
