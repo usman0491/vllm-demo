@@ -45,7 +45,7 @@ class VLLMDeployment:
             raise
     
     @ray.remote
-    async def _initialize_engine(self):
+    def _initialize_engine(self):
         """Lazy initialization of the AsyncLLMEngine."""
         if not self.engine:
             try:
@@ -66,7 +66,7 @@ class VLLMDeployment:
                     status_code=500,
                     detail=f"Error initializing engine: {str(e)}"
                 )
-    @ray.remote
+            
     @app.post("/v1/completions")
     async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
         try:
