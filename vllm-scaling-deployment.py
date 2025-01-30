@@ -44,6 +44,7 @@ class VLLMDeployment:
             logger.error(f"Failed to initialize VLLMDeployment: {e}", exc_info=True)
             raise
     
+    @ray.remote
     def _initialize_engine(self):
         """Lazy initialization of the AsyncLLMEngine."""
         if not self.engine:
