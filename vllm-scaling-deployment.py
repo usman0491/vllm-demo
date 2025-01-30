@@ -44,7 +44,6 @@ class VLLMDeployment:
             logger.error(f"Failed to initialize VLLMDeployment: {e}", exc_info=True)
             raise
     
-    @ray.remote
     def _initialize_engine(self):
         """Lazy initialization of the AsyncLLMEngine."""
         if not self.engine:
@@ -79,7 +78,7 @@ class VLLMDeployment:
                     bundles=[{"CPU": 2, "GPU": 1}])
 
             #Ensure the engine is initialized
-            await self._initialize_engine()
+            await self._initialize_engine().remote()
             
             if not self.openai_serving_chat:
                 model_config = await self.engine.get_model_config()
