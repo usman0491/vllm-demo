@@ -96,7 +96,7 @@ class VLLMDeployment:
 
     @app.post("/v1/completions")
     async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
-        await self._ensure_engine_actor()  # Ensure the engine actor is up
+        self._ensure_engine_actor()  # Ensure the engine actor is up
         response = await ray.get(self.engine_actor.get_chat_response.remote(request, raw_request))
         if "error" in response:
             return JSONResponse(content=response["error"], status_code=response["status_code"])
