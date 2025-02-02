@@ -26,6 +26,8 @@ from vllm.utils import FlexibleArgumentParser
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")
 
+app = FastAPI()
+
 @ray.remote(num_cpus=2, num_gpus=1)  # Ensure it runs on a GPU worker node
 class LLMEngineActor:
     def __init__(self, engine_args: AsyncEngineArgs):
@@ -76,6 +78,7 @@ class LLMEngineActor:
         
 
 @serve.deployment(name="VLLMDeployment")
+@serve.ingress(app)
 class VLLMDeployment:
     def __init__(self, engine_args: AsyncEngineArgs, response_role: str):
         self.app = FastAPI()
@@ -84,13 +87,7 @@ class VLLMDeployment:
         self.response_role = response_role
         self.engine_actor = None  # Will hold the remote actor reference
 
-        @self.app.post("/v1/completions")
-        async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
-            await self._ensure_engine_actor()  # Ensure the engine actor is up
-            response = await self.engine_actor.get_chat_response.remote(request, raw_request)
-            return JSONResponse(content=response)
-    
-    def _ensure_engine_actor(self):
+    async def _ensure_engine_actor(self):
         """Ensures that the LLMEngineActor is running on a worker node."""
         if self.engine_actor is None:
             logger.info("Requesting worker node with GPU...")
@@ -98,8 +95,11 @@ class VLLMDeployment:
             self.engine_actor = LLMEngineActor.remote(self.engine_args)
             logger.info("LLM Engine Actor initialized.")
 
-    def __call__(self, scope, receive, send):
-        return self.app(scope, receive, send)
+    @app.post("/v1/completions")
+    async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
+        await self._ensure_engine_actor()  # Ensure the engine actor is up
+        response = await self.engine_actor.get_chat_response.remote(request, raw_request)
+        return JSONResponse(content=response)
 
 
 def parse_vllm_args(cli_args: dict[str, str]):
