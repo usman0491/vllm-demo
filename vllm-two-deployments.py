@@ -81,7 +81,6 @@ class LLMEngineActor:
 @serve.ingress(app)
 class VLLMDeployment:
     def __init__(self, engine_args: AsyncEngineArgs, response_role: str):
-        self.app = FastAPI()
         self.openai_serving_chat = None
         self.engine_args = engine_args
         self.response_role = response_role
@@ -98,8 +97,10 @@ class VLLMDeployment:
     @app.post("/v1/completions")
     async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
         await self._ensure_engine_actor()  # Ensure the engine actor is up
-        response = await self.engine_actor.get_chat_response.remote(request, raw_request)
-        return JSONResponse(content=response)
+        response = await ray.get(self.engine_actor.get_chat_response.remote(request, raw_request))
+        if "error" in response:
+            return JSONResponse(content=response["error"], status_code=response["status_code"])
+        return JSONResponse(content=response["response"])
 
 
 def parse_vllm_args(cli_args: dict[str, str]):
