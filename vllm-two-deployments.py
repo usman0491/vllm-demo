@@ -26,56 +26,59 @@ from vllm.utils import FlexibleArgumentParser
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")
 
-app = FastAPI()
-
 @ray.remote(num_cpus=2, num_gpus=1)  # Ensure it runs on a GPU worker node
 class LLMEngineActor:
     def __init__(self, engine_args: AsyncEngineArgs):
         logger.info("Initializing LLM Engine on a worker node...")
         self.engine = AsyncLLMEngine.from_engine_args(engine_args)
+        self.openai_serving_chat = None
         logger.info("LLM Engine initialized successfully.")
 
     async def get_chat_response(self, request: ChatCompletionRequest, raw_request: Request):
-        logger.info(f"Processing request: {request}")
-        if not self.openai_serving_chat:
-            model_config = await self.engine.get_model_config()
-            if self.engine_args.served_model_name is not None:
-                served_model_names = self.engine_args.served_model_name
-            else:
-                served_model_names = [self.engine_args.model]
-            self.openai_serving_chat = OpenAIServingChat(
-                self.engine,
-                model_config,
-                served_model_names=served_model_names,
-                response_role=self.response_role,
-                lora_modules=[],  # Dummy value for LoRA modules
-                prompt_adapters=None,  # Dummy value for prompt adapters
-                request_logger=None,  # Dummy value for request logger
-                chat_template=None,  # Dummy value for chat template
-            )
-            logger.info(f"OpenAIServingChat instance initialized.")
-            
-        generator = await self.openai_serving_chat.create_chat_completion(request, raw_request)
+        try:
+            logger.info(f"Processing request: {request}")
+            if not self.openai_serving_chat:
+                model_config = await self.engine.get_model_config()
+                if self.engine_args.served_model_name is not None:
+                    served_model_names = self.engine_args.served_model_name
+                else:
+                    served_model_names = [self.engine_args.model]
+                self.openai_serving_chat = OpenAIServingChat(
+                    self.engine,
+                    model_config,
+                    served_model_names=served_model_names,
+                    response_role=self.response_role,
+                    lora_modules=[],  # Dummy value for LoRA modules
+                    prompt_adapters=None,  # Dummy value for prompt adapters
+                    request_logger=None,  # Dummy value for request logger
+                    chat_template=None,  # Dummy value for chat template
+                )
+                logger.info(f"OpenAIServingChat instance initialized.")
+                
+            generator = await self.openai_serving_chat.create_chat_completion(request, raw_request)
 
-        if isinstance(generator, ErrorResponse):
-            logger.warning(f"Error in completion generation: {generator}")
-            return JSONResponse(
-                content=generator.model_dump(), status_code=generator.code
-            )
-        
-        if request.stream:
-            logger.info(f"Streaming response back to the client.")
-            return StreamingResponse(generator, media_type="text/event-stream")
-        else:
-            assert isinstance(generator, ChatCompletionResponse)
-            logger.info(f"Returning JSON response to the client.")
-            return JSONResponse(content=generator.model_dump())
+            if isinstance(generator, ErrorResponse):
+                logger.warning(f"Error in completion generation: {generator}")
+                return JSONResponse(
+                    content=generator.model_dump(), status_code=generator.code
+                )
+            
+            if request.stream:
+                logger.info(f"Streaming response back to the client.")
+                return StreamingResponse(generator, media_type="text/event-stream")
+            else:
+                assert isinstance(generator, ChatCompletionResponse)
+                logger.info(f"Returning JSON response to the client.")
+                return JSONResponse(content=generator.model_dump())
+        except Exception as e:
+            logger.error(f"Exception in get_chat_response: {e}", exc_info=True)
+            return JSONResponse(content={"error": "Internal Server Error"}, status_code=500)
         
 
 @serve.deployment(name="VLLMDeployment")
-@serve.ingress(app)
 class VLLMDeployment:
     def __init__(self, engine_args: AsyncEngineArgs, response_role: str):
+        self.app = FastAPI()
         self.openai_serving_chat = None
         self.engine_args = engine_args
         self.response_role = response_role
@@ -89,7 +92,7 @@ class VLLMDeployment:
             self.engine_actor = LLMEngineActor.remote(self.engine_args)
             logger.info("LLM Engine Actor initialized.")
 
-    @app.post("/v1/completions")
+    @self.app.post("/v1/completions")
     async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
         await self._ensure_engine_actor()  # Ensure the engine actor is up
         response = await self.engine_actor.get_chat_response.remote(request, raw_request)
