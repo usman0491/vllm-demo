@@ -28,6 +28,40 @@ logger = logging.getLogger("ray.serve")
 
 app = FastAPI()
 
+@serve.deployment(name="VLLMDeployment")
+@serve.ingress(app)
+class VLLMDeployment:
+    def __init__(self, engine_args: AsyncEngineArgs, response_role: str):
+        self.openai_serving_chat = None
+        self.engine_args = engine_args
+        self.response_role = response_role
+        self.engine_actor = None  # Will hold the remote actor reference
+
+    async def _ensure_engine_actor(self):
+        """Ensures that the LLMEngineActor is running on a worker node."""
+        if self.engine_actor is None:
+            logger.info("Requesting worker node with GPU...")
+            request_resources([{"CPU": 2, "GPU": 1}])
+            while True:
+                resources = ray.available_resources()
+                if resources.get("GPU", 0) > 0:
+                    logger.info("Worker node detected. Initializing engine actor...")
+                    self.engine_actor = LLMEngineActor.remote(self.engine_args)
+                    logger.info("LLM Engine Actor initialized.")
+                    break
+                else:
+                    logger.info("Waiting for worker node with GPU...")
+                    time.sleep(5)
+
+
+    @app.post("/v1/completions")
+    async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
+        await self._ensure_engine_actor()  # Ensure the engine actor is up
+        response = await self.engine_actor.get_chat_response.remote(request, raw_request)
+        if "error" in response:
+            return JSONResponse(content=response["error"], status_code=response["status_code"])
+        return JSONResponse(content=response["response"])
+
 @ray.remote(num_cpus=2, num_gpus=1)  # Ensure it runs on a GPU worker node
 class LLMEngineActor:
     def __init__(self, engine_args: AsyncEngineArgs):
@@ -75,32 +109,7 @@ class LLMEngineActor:
         except Exception as e:
             logger.error(f"Exception in get_chat_response: {e}", exc_info=True)
             return JSONResponse(content={"error": "Internal Server Error"}, status_code=500)
-        
 
-@serve.deployment(name="VLLMDeployment")
-@serve.ingress(app)
-class VLLMDeployment:
-    def __init__(self, engine_args: AsyncEngineArgs, response_role: str):
-        self.openai_serving_chat = None
-        self.engine_args = engine_args
-        self.response_role = response_role
-        self.engine_actor = None  # Will hold the remote actor reference
-
-    async def _ensure_engine_actor(self):
-        """Ensures that the LLMEngineActor is running on a worker node."""
-        if self.engine_actor is None:
-            logger.info("Requesting worker node with GPU...")
-            request_resources([{"CPU": 2, "GPU": 1}])
-            self.engine_actor = LLMEngineActor.remote(self.engine_args)
-            logger.info("LLM Engine Actor initialized.")
-
-    @app.post("/v1/completions")
-    async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
-        self._ensure_engine_actor()  # Ensure the engine actor is up
-        response = await ray.get(self.engine_actor.get_chat_response.remote(request, raw_request))
-        if "error" in response:
-            return JSONResponse(content=response["error"], status_code=response["status_code"])
-        return JSONResponse(content=response["response"])
 
 
 def parse_vllm_args(cli_args: dict[str, str]):
