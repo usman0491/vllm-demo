@@ -43,7 +43,8 @@ class VLLMDeployment:
         """Ensures that the LLMEngineActor is running on a worker node."""
         if self.engine_actor is None:
             logger.info("Requesting worker node with GPU...")
-            request_resources([{"CPU": 2, "GPU": 1}])
+            request_resources(
+                    bundles=[{"CPU": 2, "GPU": 1}])
             while True:
                 resources = ray.available_resources()
                 if resources.get("GPU", 0) > 0:
