@@ -37,6 +37,8 @@ class VLLMDeployment:
         self.response_role = response_role
         self.engine_actor = None  # Will hold the remote actor reference
 
+        app.add_event_handler("startup", self.startup_event)
+
     async def _ensure_engine_actor(self):
         """Ensures that the LLMEngineActor is running on a worker node."""
         if self.engine_actor is None:
@@ -53,8 +55,7 @@ class VLLMDeployment:
                     logger.info("Waiting for worker node with GPU...")
                     time.sleep(5)
 
-    @app.on_event("startup")
-    async def startup_event():
+    async def startup_event(self):
         logger.info("Startup event triggered.")
         await self._ensure_engine_actor()
 
