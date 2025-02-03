@@ -37,6 +37,7 @@ class VLLMDeployment:
         self.response_role = response_role
         self.engine_actor = None  # Will hold the remote actor reference
         self._ensure_engine_actor()
+        self.engine_actor = AsyncLLMEngine.from_engine_args(self.engine_args)
 
     async def _ensure_engine_actor(self):
         """Ensures that the LLMEngineActor is running on a worker node."""
