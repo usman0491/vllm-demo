@@ -89,21 +89,22 @@ class VLLMDeployment:
         app.add_event_handler("startup", self.startup_event)
 
     async def _ensure_engine_actor(self):
-        """Ensures that the LLMEngineActor is running on a worker node."""
-        if self.engine_actor is None:
-            logger.info("Requesting worker node with GPU...")
-            request_resources(
-                    bundles=[{"CPU": 2, "GPU": 1}])
-            while True:
-                resources = ray.available_resources()
-                if resources.get("GPU", 0) > 0:
-                    logger.info("Worker node detected. Initializing engine actor...")
-                    self.engine_actor = LLMEngineActor.remote(self.engine_args)
-                    logger.info("LLM Engine Actor initialized.")
-                    break
-                else:
-                    logger.info("Waiting for worker node with GPU...")
-                    time.sleep(5)
+        self.engine_actor = LLMEngineActor.remote(self.engine_args)
+        # """Ensures that the LLMEngineActor is running on a worker node."""
+        # if self.engine_actor is None:
+        #     logger.info("Requesting worker node with GPU...")
+        #     request_resources(
+        #             bundles=[{"CPU": 2, "GPU": 1}])
+        #     while True:
+        #         resources = ray.available_resources()
+        #         if resources.get("GPU", 0) > 0:
+        #             logger.info("Worker node detected. Initializing engine actor...")
+        #             self.engine_actor = LLMEngineActor.remote(self.engine_args)
+        #             logger.info("LLM Engine Actor initialized.")
+        #             break
+        #         else:
+        #             logger.info("Waiting for worker node with GPU...")
+        #             time.sleep(5)
 
     async def startup_event(self):
         logger.info("Startup event triggered.")
@@ -112,7 +113,7 @@ class VLLMDeployment:
 
     @app.post("/v1/completions")
     async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
-        await self._ensure_engine_actor()  # Ensure the engine actor is up
+        # await self._ensure_engine_actor()  # Ensure the engine actor is up
         response = await self.engine_actor.get_chat_response.remote(request, raw_request)
         if "error" in response:
             return JSONResponse(content=response["error"], status_code=response["status_code"])
