@@ -23,6 +23,10 @@ from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
 from vllm.entrypoints.openai.serving_engine import LoRAModulePath
 from vllm.utils import FlexibleArgumentParser
 
+# from fastapi.middleware.authentication import AuthenticationMiddleware
+# app.add_middleware(AuthenticationMiddleware)
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")
 
@@ -114,7 +118,8 @@ class VLLMDeployment:
     @app.post("/v1/completions")
     async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
         # await self._ensure_engine_actor()  # Ensure the engine actor is up
-        response = await self.engine_actor.get_chat_response.remote(request, raw_request)
+        request_data = request.json()
+        response = await self.engine_actor.get_chat_response.remote(request_data, raw_request)
         if "error" in response:
             return JSONResponse(content=response["error"], status_code=response["status_code"])
         return JSONResponse(content=response["response"])
