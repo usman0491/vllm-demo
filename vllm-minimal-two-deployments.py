@@ -93,11 +93,15 @@ class VLLMDeployment:
 
     async def _ensure_engine_actor(self):
         global actor_registry
-        if "llm_actor" not in actor_registry:
+        try:
+            actor_registry["llm_actor"] = ray.get_actor("llm_actor")
+        except ValueError:        
             request_resources(
                 bundles=[{"CPU": 2, "GPU": 1}])
+            
             time.sleep(120)
-            actor_registry["llm_actor"] = LLMEngineActor.remote(self.engine_args)
+
+            actor_registry["llm_actor"] = LLMEngineActor.options(name="llm_actor").remote(self.engine_args)
         # """Ensures that the LLMEngineActor is running on a worker node."""
         # if self.engine_actor is None:
         #     logger.info("Requesting worker node with GPU...")
