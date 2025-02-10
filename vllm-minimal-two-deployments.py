@@ -24,7 +24,6 @@ from vllm.entrypoints.openai.serving_engine import LoRAModulePath
 from vllm.utils import FlexibleArgumentParser
 
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")
 
