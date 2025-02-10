@@ -23,8 +23,6 @@ from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
 from vllm.entrypoints.openai.serving_engine import LoRAModulePath
 from vllm.utils import FlexibleArgumentParser
 
-from fastapi.middleware.authentication import AuthenticationMiddleware
-app.add_middleware(AuthenticationMiddleware)
 
 
 logging.basicConfig(level=logging.INFO)
