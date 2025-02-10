@@ -28,13 +28,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")
 
 
-@ray.remote(num_cpus=2, num_gpus=1)  # Ensure it runs on a GPU worker node 
-class LLMEngineActor:
-    def __init__(self, engine_args: AsyncEngineArgs):
-        logger.info("Initializing LLM Engine on a worker node...")
-        self.engine = AsyncLLMEngine.from_engine_args(engine_args)
-        self.openai_serving_chat = None
-        logger.info("LLM Engine initialized successfully.")
+# @ray.remote(num_cpus=2, num_gpus=1)  # Ensure it runs on a GPU worker node 
+# class LLMEngineActor:
+#     def __init__(self, engine_args: AsyncEngineArgs):
+#         logger.info("Initializing LLM Engine on a worker node...")
+#         self.engine = AsyncLLMEngine.from_engine_args(engine_args)
+#         self.openai_serving_chat = None
+#         logger.info("LLM Engine initialized successfully.")
 
 
 app = FastAPI()
@@ -46,7 +46,8 @@ class VLLMDeployment:
         self.engine_args = engine_args
         self.response_role = response_role
         self.engine_actor = None  # Will hold the remote actor reference
-        app.add_event_handler("startup", self.startup_event)
+        self.engine = AsyncLLMEngine.from_engine_args(self.engine_args)
+        # app.add_event_handler("startup", self.startup_event)
 
     async def _ensure_engine_actor(self):
         # self.engine_actor = LLMEngineActor.remote(self.engine_args)
