@@ -46,8 +46,9 @@ class VLLMDeployment:
         self.engine_args = engine_args
         self.response_role = response_role
         self.engine_actor = None  # Will hold the remote actor reference
-        self.engine = AsyncLLMEngine.from_engine_args(self.engine_args)
+        # self.engine = AsyncLLMEngine.from_engine_args(self.engine_args)
         # app.add_event_handler("startup", self.startup_event)
+        ray.get(self._ensure_engine_actor())
 
     async def _ensure_engine_actor(self):
         # self.engine_actor = LLMEngineActor.remote(self.engine_args)
