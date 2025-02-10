@@ -23,21 +23,64 @@ from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
 from vllm.entrypoints.openai.serving_engine import LoRAModulePath
 from vllm.utils import FlexibleArgumentParser
 
+from fastapi.middleware.authentication import AuthenticationMiddleware
+app.add_middleware(AuthenticationMiddleware)
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")
 
+@ray.remote  # Ensure it runs on a GPU worker node (num_cpus=2, num_gpus=1)
+class LLMEngineActor:
+    def __init__(self, engine_args: AsyncEngineArgs):
+        logger.info("Initializing LLM Engine on a worker node...")
+        self.engine = AsyncLLMEngine.from_engine_args(engine_args)
+        self.openai_serving_chat = None
+        logger.info("LLM Engine initialized successfully.")
 
-# @ray.remote(num_cpus=2, num_gpus=1)  # Ensure it runs on a GPU worker node 
-# class LLMEngineActor:
-#     def __init__(self, engine_args: AsyncEngineArgs):
-#         logger.info("Initializing LLM Engine on a worker node...")
-#         self.engine = AsyncLLMEngine.from_engine_args(engine_args)
-#         self.openai_serving_chat = None
-#         logger.info("LLM Engine initialized successfully.")
+    async def get_chat_response(self, request: ChatCompletionRequest, raw_request: Request):
+        try:
+            logger.info(f"Processing request: {request}")
+            # if not self.openai_serving_chat:
+            #     model_config = await self.engine.get_model_config()
+            #     if self.engine_args.served_model_name is not None:
+            #         served_model_names = self.engine_args.served_model_name
+            #     else:
+            #         served_model_names = [self.engine_args.model]
+            #     self.openai_serving_chat = OpenAIServingChat(
+            #         self.engine,
+            #         model_config,
+            #         served_model_names=served_model_names,
+            #         response_role=self.response_role,
+            #         lora_modules=[],  # Dummy value for LoRA modules
+            #         prompt_adapters=None,  # Dummy value for prompt adapters
+            #         request_logger=None,  # Dummy value for request logger
+            #         chat_template=None,  # Dummy value for chat template
+            #     )
+            #     logger.info(f"OpenAIServingChat instance initialized.")
+                
+            # generator = await self.openai_serving_chat.create_chat_completion(request, raw_request)
+
+            # if isinstance(generator, ErrorResponse):
+            #     logger.warning(f"Error in completion generation: {generator}")
+            #     return JSONResponse(
+            #         content=generator.model_dump(), status_code=generator.code
+            #     )
+            
+            # if request.stream:
+            #     logger.info(f"Streaming response back to the client.")
+            #     return StreamingResponse(generator, media_type="text/event-stream")
+            # else:
+            #     assert isinstance(generator, ChatCompletionResponse)
+            #     logger.info(f"Returning JSON response to the client.")
+            #     return JSONResponse(content=generator.model_dump())
+        except Exception as e:
+            logger.error(f"Exception in get_chat_response: {e}", exc_info=True)
+            # return JSONResponse(content={"error": "Internal Server Error"}, status_code=500)
 
 
 app = FastAPI()
+
 @serve.deployment(name="VLLMDeployment")
 @serve.ingress(app)
 class VLLMDeployment:
@@ -46,13 +89,11 @@ class VLLMDeployment:
         self.engine_args = engine_args
         self.response_role = response_role
         self.engine_actor = None  # Will hold the remote actor reference
-        # self.engine = AsyncLLMEngine.from_engine_args(self.engine_args)
-        # app.add_event_handler("startup", self.startup_event)
-        ray.get(self.startup_event())
+
+        app.add_event_handler("startup", self.startup_event)
 
     async def _ensure_engine_actor(self):
-        # self.engine_actor = LLMEngineActor.remote(self.engine_args)
-        self.engine = AsyncLLMEngine.from_engine_args(self.engine_args)
+        self.engine_actor = LLMEngineActor.remote(self.engine_args)
         # """Ensures that the LLMEngineActor is running on a worker node."""
         # if self.engine_actor is None:
         #     logger.info("Requesting worker node with GPU...")
@@ -72,6 +113,18 @@ class VLLMDeployment:
     async def startup_event(self):
         logger.info("Startup event triggered.")
         await self._ensure_engine_actor()
+
+
+    @app.post("/v1/completions")
+    async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
+        # await self._ensure_engine_actor()  # Ensure the engine actor is up
+        request_data = request.json()
+        # response = await self.engine_actor.get_chat_response.remote(request_data, raw_request)
+        # if "error" in response:
+        #     return JSONResponse(content=response["error"], status_code=response["status_code"])
+        # return JSONResponse(content=response["response"])
+
+
 
 
 def parse_vllm_args(cli_args: dict[str, str]):
