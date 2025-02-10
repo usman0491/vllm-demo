@@ -93,8 +93,8 @@ class VLLMDeployment:
     actor_registry = {}
 
     async def _ensure_engine_actor(self):
-        if "llm_actor" not in actor_registry:
-            actor_registry["llm_actor"] = LLMEngineActor.remote(self.engine_args)
+        if "llm_actor" not in self.actor_registry:
+            self.actor_registry["llm_actor"] = LLMEngineActor.remote(self.engine_args)
         # """Ensures that the LLMEngineActor is running on a worker node."""
         # if self.engine_actor is None:
         #     logger.info("Requesting worker node with GPU...")
