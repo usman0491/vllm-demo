@@ -77,6 +77,7 @@ class LLMEngineActor:
 
 
 app = FastAPI()
+actor_registry = {}
 
 @serve.deployment(name="VLLMDeployment")
 @serve.ingress(app)
@@ -90,11 +91,10 @@ class VLLMDeployment:
         app.add_event_handler("startup", self.startup_event)
 
 
-    actor_registry = {}
-
     async def _ensure_engine_actor(self):
-        if "llm_actor" not in self.actor_registry:
-            self.actor_registry["llm_actor"] = LLMEngineActor.remote(self.engine_args)
+        global actor_registry
+        if "llm_actor" not in actor_registry:
+            actor_registry["llm_actor"] = LLMEngineActor.remote(self.engine_args)
         # """Ensures that the LLMEngineActor is running on a worker node."""
         # if self.engine_actor is None:
         #     logger.info("Requesting worker node with GPU...")
