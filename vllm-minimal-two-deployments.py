@@ -34,6 +34,12 @@ class LLMEngineActor:
         self.engine = AsyncLLMEngine.from_engine_args(engine_args)
         self.openai_serving_chat = None
         logger.info("LLM Engine initialized successfully.")
+        self.keep_alive_task = self._keep_alive.remote()
+
+    @ray.remote
+    def _keep_alive(self):
+        while True:
+            time.sleep(60)
 
     async def get_chat_response(self, request: ChatCompletionRequest, raw_request: Request):
         try:
