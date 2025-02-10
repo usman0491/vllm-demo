@@ -27,7 +27,7 @@ from vllm.utils import FlexibleArgumentParser
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")
 
-@ray.remote  # Ensure it runs on a GPU worker node (num_cpus=2, num_gpus=1)
+@ray.remote(num_cpus=2, num_gpus=1)  # Ensure it runs on a GPU worker node 
 class LLMEngineActor:
     def __init__(self, engine_args: AsyncEngineArgs):
         logger.info("Initializing LLM Engine on a worker node...")
