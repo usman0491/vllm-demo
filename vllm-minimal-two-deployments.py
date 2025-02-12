@@ -94,7 +94,7 @@ class VLLMDeployment:
         self.engine_actor = None  # Will hold the remote actor reference
 
         self.last_request_time = time.time()  # Track last request timestamp
-        self.shutdown_timeout = 300  # Set timeout (e.g., 5 minutes)
+        self.shutdown_timeout = 360  # Set timeout (e.g., 5 minutes)
 
         # Start the background monitoring task
         self._start_inactivity_monitor()
