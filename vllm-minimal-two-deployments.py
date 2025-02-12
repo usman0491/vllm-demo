@@ -103,7 +103,7 @@ class VLLMDeployment:
         except ValueError:        
             request_resources(
                 bundles=[{"CPU": 2, "GPU": 1}])
-            time.sleep(120)
+            time.sleep(60)
             actor_registry["llm_actor"] = LLMEngineActor.options(name="llm_actor", scheduling_strategy="SPREAD", lifetime="detached").remote(self.engine_args)
 
 
