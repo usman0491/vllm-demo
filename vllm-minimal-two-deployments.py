@@ -45,9 +45,11 @@ class LLMEngineActor:
             time.sleep(60)
 
     async def get_chat_response(self, request_dict: dict, Response_role: str):
-        request = ChatCompletionRequest(**request_dict)
         try:
+            request = ChatCompletionRequest(**request_dict)
             logger.info(f"Processing request: {request}")
+
+            # Ensure OpenAIServingChat is initialized
             if not self.openai_serving_chat:
                 logger.info("Initializing OpenAIServingChat...")
                 model_config = await self.engine.get_model_config()
@@ -66,21 +68,20 @@ class LLMEngineActor:
                 )
                 logger.info(f"OpenAIServingChat initialized.")
                 
+            # Call the chat completion function
             logger.info("Calling create_chat_completion()...")
             generator = await self.openai_serving_chat.create_chat_completion(request)
             logger.info("create_chat_completion() executed successfully.")
 
+            # Handle errors
             if isinstance(generator, ErrorResponse):
                 logger.warning(f"Error in completion generation: {generator}")
                 return {"error": generator.model_dump(), "status_code": generator.code}
-            
-            if request.stream:
-                logger.info(f"Streaming response back to the client.")
-                return {"stream": list(generator)}
-            else:
-                assert isinstance(generator, ChatCompletionResponse)
-                logger.info(f"Returning JSON response to the client.")
-                return generator.model_dump()
+
+            # Ensure correct response format
+            assert isinstance(generator, ChatCompletionResponse)
+            logger.info(f"Returning JSON response to the client.")
+            return generator.model_dump()
         except Exception as e:
             logger.error(f"Exception in get_chat_response: {e}", exc_info=True)
             return {"error": str(e), "status_code": 500}
@@ -126,18 +127,19 @@ class VLLMDeployment:
         logger.info(f"Received request: {request.dict()}")
         logger.info(f"Ensuring if the engine actor is UP")
         await self._ensure_engine_actor()  # Ensure the engine actor is up
+
         logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
         response = await self.engine_actor.get_chat_response.remote(request.dict(), self.response_role)
         # response = await self.engine_actor.test_function.remote()
         logger.info(f"Request to LLMEngineActor completed: {request.dict()}")
 
+        # Handle error response
         if "error" in response:
-            return JSONResponse(content={"error": response["error"]}, status_code=response["status_code"])
-        if "stream" in response:
-            logger.info(f"Streaming response back to the client.")
-            return StreamingResponse(iter(response["stream"]), media_type="text/event-stream")
+            logger.warning(f"Error from engine actor: {response['error']}")
+            return JSONResponse(content={"error": response["error"]}, status_code=500)
         
-        logger.info(f"Returning JSON response to the client.")
+        # Return response as JSON
+        logger.info("Returning JSON response to the client.")
         return JSONResponse(content=response)
 
 
