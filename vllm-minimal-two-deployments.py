@@ -67,7 +67,7 @@ class LLMEngineActor:
                 logger.info(f"OpenAIServingChat initialized.")
                 
             logger.info("Calling create_chat_completion()...")
-            generator = await self.openai_serving_chat.create_chat_completion(request, raw_request)
+            generator = await self.openai_serving_chat.create_chat_completion(request)
             logger.info("create_chat_completion() executed successfully.")
 
             if isinstance(generator, ErrorResponse):
@@ -76,7 +76,7 @@ class LLMEngineActor:
             
             if request.stream:
                 logger.info(f"Streaming response back to the client.")
-                return {"stream": generator}
+                return {"stream": list(generator)}
             else:
                 assert isinstance(generator, ChatCompletionResponse)
                 logger.info(f"Returning JSON response to the client.")
@@ -132,10 +132,11 @@ class VLLMDeployment:
         logger.info(f"Request to LLMEngineActor completed: {request.dict()}")
 
         if "error" in response:
-            return JSONResponse(content=response["error"], status_code=response["status_code"])
+            return JSONResponse(content={"error": response["error"]}, status_code=response["status_code"])
         if "stream" in response:
             logger.info(f"Streaming response back to the client.")
-            return StreamingResponse(response["stream"], media_type="text/event-stream")
+            return StreamingResponse(iter(response["stream"]), media_type="text/event-stream")
+        
         logger.info(f"Returning JSON response to the client.")
         return JSONResponse(content=response)
 
