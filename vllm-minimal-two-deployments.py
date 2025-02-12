@@ -34,7 +34,7 @@ class LLMEngineActor:
         self.engine = AsyncLLMEngine.from_engine_args(engine_args)
         self.openai_serving_chat = None
         logger.info("LLM Engine initialized successfully.")
-        self.keep_alive_task = self._keep_alive()
+        # self.keep_alive_task = self._keep_alive()
 
     def _keep_alive(self):
         while True:
