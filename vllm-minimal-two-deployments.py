@@ -45,47 +45,49 @@ class LLMEngineActor:
             time.sleep(60)
 
     async def get_chat_response(self, request_dict: dict, Response_role: str):
-        request = ChatCompletionRequest(**request_dict)
-        try:
-            logger.info(f"Processing request: {request}")
-            if not self.openai_serving_chat:
-                logger.info("Initializing OpenAIServingChat...")
-                model_config = await self.engine.get_model_config()
-                logger.info(f"Model config retrieved: {model_config}")
+        return JSONResponse(content=request_dict)
 
-                served_model_names = self.engine_args.served_model_name or [self.engine_args.model]
-                self.openai_serving_chat = OpenAIServingChat(
-                    self.engine,
-                    model_config,
-                    served_model_names=served_model_names,
-                    response_role = Response_role,
-                    lora_modules=[],  # Dummy value for LoRA modules
-                    prompt_adapters=None,  # Dummy value for prompt adapters
-                    request_logger=None,  # Dummy value for request logger
-                    chat_template=None,  # Dummy value for chat template
-                )
-                logger.info(f"OpenAIServingChat initialized.")
+        # request = ChatCompletionRequest(**request_dict)
+        # try:
+        #     logger.info(f"Processing request: {request}")
+        #     if not self.openai_serving_chat:
+        #         logger.info("Initializing OpenAIServingChat...")
+        #         model_config = await self.engine.get_model_config()
+        #         logger.info(f"Model config retrieved: {model_config}")
+
+        #         served_model_names = self.engine_args.served_model_name or [self.engine_args.model]
+        #         self.openai_serving_chat = OpenAIServingChat(
+        #             self.engine,
+        #             model_config,
+        #             served_model_names=served_model_names,
+        #             response_role = Response_role,
+        #             lora_modules=[],  # Dummy value for LoRA modules
+        #             prompt_adapters=None,  # Dummy value for prompt adapters
+        #             request_logger=None,  # Dummy value for request logger
+        #             chat_template=None,  # Dummy value for chat template
+        #         )
+        #         logger.info(f"OpenAIServingChat initialized.")
                 
-            logger.info("Calling create_chat_completion()...")
-            generator = await self.openai_serving_chat.create_chat_completion(request, raw_request)
-            logger.info("create_chat_completion() executed successfully.")
+        #     logger.info("Calling create_chat_completion()...")
+        #     generator = await self.openai_serving_chat.create_chat_completion(request, raw_request)
+        #     logger.info("create_chat_completion() executed successfully.")
 
-            if isinstance(generator, ErrorResponse):
-                logger.warning(f"Error in completion generation: {generator}")
-                return JSONResponse(
-                    content=generator.model_dump(), status_code=generator.code
-                )
+        #     if isinstance(generator, ErrorResponse):
+        #         logger.warning(f"Error in completion generation: {generator}")
+        #         return JSONResponse(
+        #             content=generator.model_dump(), status_code=generator.code
+        #         )
             
-            if request.stream:
-                logger.info(f"Streaming response back to the client.")
-                return StreamingResponse(generator, media_type="text/event-stream")
-            else:
-                assert isinstance(generator, ChatCompletionResponse)
-                logger.info(f"Returning JSON response to the client.")
-                return JSONResponse(content=generator.model_dump())
-        except Exception as e:
-            logger.error(f"Exception in get_chat_response: {e}", exc_info=True)
-            return JSONResponse(content={"error": str(e)}, status_code=500)
+        #     if request.stream:
+        #         logger.info(f"Streaming response back to the client.")
+        #         return StreamingResponse(generator, media_type="text/event-stream")
+        #     else:
+        #         assert isinstance(generator, ChatCompletionResponse)
+        #         logger.info(f"Returning JSON response to the client.")
+        #         return JSONResponse(content=generator.model_dump())
+        # except Exception as e:
+        #     logger.error(f"Exception in get_chat_response: {e}", exc_info=True)
+        #     return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
 app = FastAPI()
@@ -132,11 +134,12 @@ class VLLMDeployment:
         response = await self.engine_actor.get_chat_response.remote(request.dict(), self.response_role)
         # response = await self.engine_actor.test_function.remote()
         logger.info(f"Request to LLMEngineActor completed: {request.dict()}")
-        if "error" in response:
-            return JSONResponse(content=response["error"], status_code=response["status_code"])
-            # return JSONResponse(content={"actor_response": response})
-        return JSONResponse(content=response["response"])
-        # return JSONResponse(content={"actor_response": response})
+        return JSONResponse(content=response)
+        # if "error" in response:
+        #     return JSONResponse(content=response["error"], status_code=response["status_code"])
+        #     # return JSONResponse(content={"actor_response": response})
+        # return JSONResponse(content=response["response"])
+        # # return JSONResponse(content={"actor_response": response})
 
 
 
