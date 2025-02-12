@@ -118,15 +118,17 @@ class VLLMDeployment:
 
     @app.post("/v1/completions")
     async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
-        logger.info(f"Ensuring if the engine actor is UP")
-        await self._ensure_engine_actor()  # Ensure the engine actor is up
-        logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
-        # request_data = request.dict()
-        response = await self.engine_actor.get_chat_response.remote(request, raw_request, self.response_role)
-        logger.info(f"Request to LLMEngineActor completed: {request.dict()}")
-        if "error" in response:
-            return JSONResponse(content=response["error"], status_code=response["status_code"])
-        return JSONResponse(content=response["response"])
+        logger.info(f"Received request: {request.dict()}")
+        return JSONResponse(content={"message": "Request received successfully!"})
+        # logger.info(f"Ensuring if the engine actor is UP")
+        # await self._ensure_engine_actor()  # Ensure the engine actor is up
+        # logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
+        # # request_data = request.dict()
+        # response = await self.engine_actor.get_chat_response.remote(request, raw_request, self.response_role)
+        # logger.info(f"Request to LLMEngineActor completed: {request.dict()}")
+        # if "error" in response:
+        #     return JSONResponse(content=response["error"], status_code=response["status_code"])
+        # return JSONResponse(content=response["response"])
 
 
 
