@@ -115,6 +115,7 @@ class VLLMDeployment:
                     logger.info(f"No requests received for {self.shutdown_timeout} seconds. Shutting down worker node.")
                     ray.kill(self.engine_actor)
                     self.engine_actor = None
+                    request_resources(bundles=[])
                     logger.info("Worker node shut down successfully.")
 
 
