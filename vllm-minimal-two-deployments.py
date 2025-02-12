@@ -78,7 +78,7 @@ class LLMEngineActor:
                 return JSONResponse(content=generator.model_dump())
         except Exception as e:
             logger.error(f"Exception in get_chat_response: {e}", exc_info=True)
-            return JSONResponse(content={"error": "Internal Server Error..."}, status_code=500)
+            return JSONResponse(content={"error": str(e)}, status_code=500)
 
 
 app = FastAPI()
@@ -118,9 +118,12 @@ class VLLMDeployment:
 
     @app.post("/v1/completions")
     async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
+        logger.info(f"Ensuring if the engine actor is UP")
         await self._ensure_engine_actor()  # Ensure the engine actor is up
-        request_data = request.dict()
-        response = await self.engine_actor.get_chat_response.remote(request_data, raw_request, self.response_role)
+        logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
+        # request_data = request.dict()
+        response = await self.engine_actor.get_chat_response.remote(request, raw_request, self.response_role)
+        logger.info(f"Request to LLMEngineActor completed: {request.dict()}")
         if "error" in response:
             return JSONResponse(content=response["error"], status_code=response["status_code"])
         return JSONResponse(content=response["response"])
