@@ -135,11 +135,12 @@ class VLLMDeployment:
         response = await self.engine_actor.get_chat_response.remote(request.dict(), self.response_role)
         # response = await self.engine_actor.test_function.remote()
         logger.info(f"Request to LLMEngineActor completed: {request.dict()}")
-        if "error" in response:
-            return JSONResponse(content=response["error"], status_code=response["status_code"])
-            # return JSONResponse(content={"actor_response": response})
-        return JSONResponse(content=response["response"])
-        # return JSONResponse(content={"actor_response": response})
+        return JSONResponse(content=response)
+        # if "error" in response:
+        #     return JSONResponse(content=response["error"], status_code=response["status_code"])
+        #     # return JSONResponse(content={"actor_response": response})
+        # return JSONResponse(content=response["response"])
+        # # return JSONResponse(content={"actor_response": response})
 
 
 
