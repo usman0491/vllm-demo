@@ -44,7 +44,8 @@ class LLMEngineActor:
         while True:
             time.sleep(60)
 
-    async def get_chat_response(self, request: ChatCompletionRequest, raw_request: Request, Response_role: str):
+    async def get_chat_response(self, request_dict, Response_role: str):
+        request = ChatCompletionRequest(**request_dict)
         try:
             logger.info(f"Processing request: {request}")
             if not self.openai_serving_chat:
@@ -128,7 +129,7 @@ class VLLMDeployment:
         logger.info(f"Ensuring if the engine actor is UP")
         await self._ensure_engine_actor()  # Ensure the engine actor is up
         logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
-        response = await self.engine_actor.get_chat_response.remote(request, raw_request, self.response_role)
+        response = await self.engine_actor.get_chat_response.remote(request.dict(), self.response_role)
         # response = await self.engine_actor.test_function.remote()
         logger.info(f"Request to LLMEngineActor completed: {request.dict()}")
         if "error" in response:
