@@ -49,7 +49,7 @@ class LLMEngineActor:
         try:
             logger.info(f"Processing request: {request}")
             if not self.openai_serving_chat:
-                logger.info("🔧 Initializing OpenAIServingChat...")
+                logger.info("Initializing OpenAIServingChat...")
                 model_config = await self.engine.get_model_config()
                 logger.info(f"Model config retrieved: {model_config}")
 
