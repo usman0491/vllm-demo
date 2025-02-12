@@ -44,7 +44,7 @@ class LLMEngineActor:
         while True:
             time.sleep(60)
 
-    async def get_chat_response(self, request_dict, Response_role: str):
+    async def get_chat_response(self, request_dict: dict, Response_role: str):
         request = ChatCompletionRequest(**request_dict)
         try:
             logger.info(f"Processing request: {request}")
