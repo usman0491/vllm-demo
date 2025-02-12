@@ -78,7 +78,7 @@ class LLMEngineActor:
                 return JSONResponse(content=generator.model_dump())
         except Exception as e:
             logger.error(f"Exception in get_chat_response: {e}", exc_info=True)
-            return JSONResponse(content={"error": "Internal Server Error"}, status_code=500)
+            return JSONResponse(content={"error": "Internal Server Error..."}, status_code=500)
 
 
 app = FastAPI()
