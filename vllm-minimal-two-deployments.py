@@ -48,11 +48,11 @@ class LLMEngineActor:
         try:
             logger.info(f"Processing request: {request}")
             if not self.openai_serving_chat:
+                logger.info("🔧 Initializing OpenAIServingChat...")
                 model_config = await self.engine.get_model_config()
-                if self.engine_args.served_model_name is not None:
-                    served_model_names = self.engine_args.served_model_name
-                else:
-                    served_model_names = [self.engine_args.model]
+                logger.info(f"Model config retrieved: {model_config}")
+
+                served_model_names = self.engine_args.served_model_name or [self.engine_args.model]
                 self.openai_serving_chat = OpenAIServingChat(
                     self.engine,
                     model_config,
@@ -63,9 +63,11 @@ class LLMEngineActor:
                     request_logger=None,  # Dummy value for request logger
                     chat_template=None,  # Dummy value for chat template
                 )
-                logger.info(f"OpenAIServingChat instance initialized.")
+                logger.info(f"OpenAIServingChat initialized.")
                 
+            logger.info("Calling create_chat_completion()...")
             generator = await self.openai_serving_chat.create_chat_completion(request, raw_request)
+            logger.info("create_chat_completion() executed successfully.")
 
             if isinstance(generator, ErrorResponse):
                 logger.warning(f"Error in completion generation: {generator}")
@@ -126,15 +128,14 @@ class VLLMDeployment:
         logger.info(f"Ensuring if the engine actor is UP")
         await self._ensure_engine_actor()  # Ensure the engine actor is up
         logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
-        # request_data = request.dict()
-        # response = await self.engine_actor.get_chat_response.remote(request, raw_request, self.response_role)
-        response = await self.engine_actor.test_function.remote()
+        response = await self.engine_actor.get_chat_response.remote(request, raw_request, self.response_role)
+        # response = await self.engine_actor.test_function.remote()
         logger.info(f"Request to LLMEngineActor completed: {request.dict()}")
         if "error" in response:
-            # return JSONResponse(content=response["error"], status_code=response["status_code"])
-            return JSONResponse(content={"actor_response": response})
-        # return JSONResponse(content=response["response"])
-        return JSONResponse(content={"actor_response": response})
+            return JSONResponse(content=response["error"], status_code=response["status_code"])
+            # return JSONResponse(content={"actor_response": response})
+        return JSONResponse(content=response["response"])
+        # return JSONResponse(content={"actor_response": response})
 
 
 
