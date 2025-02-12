@@ -31,6 +31,7 @@ logger = logging.getLogger("ray.serve")
 class LLMEngineActor:
     def __init__(self, engine_args: AsyncEngineArgs):
         logger.info("Initializing LLM Engine on a worker node...")
+        self.engine_args = engine_args
         self.engine = AsyncLLMEngine.from_engine_args(engine_args)
         self.openai_serving_chat = None
         logger.info("LLM Engine initialized successfully.")
