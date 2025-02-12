@@ -2,6 +2,7 @@ import os
 import time
 import logging
 from typing import Dict
+import asyncio
 
 from fastapi import FastAPI, HTTPException
 from starlette.requests import Request
@@ -92,7 +93,29 @@ class VLLMDeployment:
         self.response_role = response_role
         self.engine_actor = None  # Will hold the remote actor reference
 
+        self.last_request_time = time.time()  # Track last request timestamp
+        self.shutdown_timeout = 300  # Set timeout (e.g., 5 minutes)
+
+        # Start the background monitoring task
+        self._start_inactivity_monitor()
+
         # app.add_event_handler("startup", self.startup_event)
+
+    def _start_inactivity_monitor(self):
+        """Start a background task to monitor inactivity and shut down the worker node."""
+        asyncio.create_task(self._monitor_inactivity())
+
+    async def _monitor_inactivity(self):
+        """Periodically check if the worker node has been idle for too long and shut it down."""
+        while True:
+            await asyncio.sleep(60)  # Check every 60 seconds
+            if self.engine_actor:
+                idle_time = time.time() - self.last_request_time
+                if idle_time > self.shutdown_timeout:
+                    logger.info(f"No requests received for {self.shutdown_timeout} seconds. Shutting down worker node.")
+                    ray.kill(self.engine_actor)
+                    self.engine_actor = None
+                    logger.info("Worker node shut down successfully.")
 
 
     async def _ensure_engine_actor(self):
@@ -107,7 +130,7 @@ class VLLMDeployment:
                 name="llm_actor", scheduling_strategy="SPREAD", lifetime="detached"
             ).remote(self.engine_args)
         actor_registry["llm_actor"] = self.engine_actor
-
+        self.last_request_time = time.time()  # Reset the timer on each request
 
 
     # async def startup_event(self):
@@ -117,9 +140,9 @@ class VLLMDeployment:
 
     @app.post("/v1/completions")
     async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
-        logger.info(f"Received request: {request.dict()}")
         logger.info(f"Ensuring if the engine actor is UP")
         await self._ensure_engine_actor()  # Ensure the engine actor is up
+        self.last_request_time = time.time()  # Reset the timer on each request
 
         logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
         response = await self.engine_actor.get_chat_response.remote(request.dict(), self.response_role)
