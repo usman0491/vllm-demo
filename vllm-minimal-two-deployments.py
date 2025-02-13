@@ -40,15 +40,10 @@ class LLMEngineActor:
 
     async def get_chat_response(self, request_dict: dict, Response_role: str):
         try:
-            # Ensure 'role' exists in messages
-            for message in request_dict.get("messages", []):
-                if "role" not in message:
-                    message["role"] = "user"  # Default to 'user' if missing
-
             # Remove unwanted parameters
             request_dict.pop("logprobs", None)
             request_dict.pop("top_logprobs", None)
-            
+
             request = ChatCompletionRequest(**request_dict)
             logger.info(f"Processing request: {request}")
 
