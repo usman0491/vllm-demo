@@ -126,12 +126,21 @@ class VLLMDeployment:
         except ValueError:        
             request_resources(
                 bundles=[{"CPU": 2, "GPU": 1}])
-            time.sleep(60)
-            self.engine_actor = LLMEngineActor.options(
-                name="llm_actor", scheduling_strategy="SPREAD", lifetime="detached"
-            ).remote(self.engine_args)
-        actor_registry["llm_actor"] = self.engine_actor
-        self.last_request_time = time.time()  # Reset the timer on each request
+            # time.sleep(60)
+            while True:
+                resources = ray.available_resources()
+                if resources.get("GPU", 0) > 0:  # Check if a worker with GPU exists
+                    logger.info("Worker node detected. Initializing engine...")
+                    self.engine_actor = LLMEngineActor.options(
+                        name="llm_actor", scheduling_strategy="SPREAD", lifetime="detached"
+                    ).remote(self.engine_args)
+                    actor_registry["llm_actor"] = self.engine_actor
+                    self.last_request_time = time.time()  # Reset the timer on each request
+                    logger.info("AsyncLLMEngine initialized successfully.")
+                    break
+                else:
+                    logger.info("No worker nodes yet. Waiting...")
+                    time.sleep(10)  # Wait before checking again
 
 
     # async def startup_event(self):
