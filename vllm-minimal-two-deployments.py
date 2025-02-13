@@ -82,7 +82,6 @@ class LLMEngineActor:
 
 
 app = FastAPI()
-actor_registry = {}
 
 @serve.deployment(name="VLLMDeployment")
 @serve.ingress(app)
@@ -120,7 +119,6 @@ class VLLMDeployment:
 
 
     async def _ensure_engine_actor(self):
-        global actor_registry
         try:
             self.engine_actor = ray.get_actor("llm_actor")
         except ValueError:        
@@ -134,7 +132,6 @@ class VLLMDeployment:
                     self.engine_actor = LLMEngineActor.options(
                         name="llm_actor", scheduling_strategy="SPREAD", lifetime="detached"
                     ).remote(self.engine_args)
-                    actor_registry["llm_actor"] = self.engine_actor
                     self.last_request_time = time.time()  # Reset the timer on each request
                     logger.info("AsyncLLMEngine initialized successfully.")
                     break
