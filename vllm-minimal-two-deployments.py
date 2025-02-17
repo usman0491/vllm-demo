@@ -143,6 +143,8 @@ class VLLMDeployment:
         self.engine_actors[model_name] = None
         asyncio.create_task(self._initialize_model_async(model_name))
 
+    async def _initialize_model_async(self, model_name: str):
+        logger.info(f"Waiting for worker node to become available for model {model_name}...")
         while True:
             resources = ray.cluster_resources()
             if resources.get("GPU", 0) >= self.num_models:
@@ -150,7 +152,6 @@ class VLLMDeployment:
                 self.engine_actors[model_name] = LLMEngineActor.options(
                     name=f"llm_actor_{model_name}", scheduling_strategy="SPREAD", lifetime="detached"
                 ).remote(self.engine_args)
-                ############# Need to save the avtive models names along with the number of models, there should be an endpoint listing the number of active models
                 logger.info(f"AsyncLLMEngine for {model_name} initialized successfully.")
                 break
             else:
@@ -163,6 +164,13 @@ class VLLMDeployment:
         model_name = request.model # Extract model name from the request
         logger.info(f"Ensuring if the engine actor is UP")
         await self._ensure_engine_actor(model_name)  # Ensure the engine actor is up
+
+        if self.engine_actors[model_name] is None:
+            return JSONResponse(
+            content={"message": f"Model {model_name} is starting, please try again later."},
+            status_code=503
+        )
+        
         self.last_request_time[model_name] = time.time() # Reset the timer on each request
 
         logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
