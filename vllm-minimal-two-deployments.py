@@ -134,6 +134,9 @@ class VLLMDeployment:
         if model_name in self.engine_actors:
             return
         
+        # Set last request time to the current time to avoid immediate shutdown
+        self.last_request_time[model_name] = time.time()
+        
         self.active_models.add(model_name)
         self.num_models += 1
         self.engine_args.model = model_name # Update model name in engine_args
@@ -170,7 +173,7 @@ class VLLMDeployment:
             content={"message": f"Model {model_name} is starting, please try again later."},
             status_code=503
         )
-        
+
         self.last_request_time[model_name] = time.time() # Reset the timer on each request
 
         logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
