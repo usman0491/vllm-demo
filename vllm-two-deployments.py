@@ -2,6 +2,7 @@ import os
 import time
 import logging
 from typing import Dict
+import asyncio
 
 from fastapi import FastAPI, HTTPException
 from starlette.requests import Request
@@ -35,18 +36,14 @@ class LLMEngineActor:
         self.engine = AsyncLLMEngine.from_engine_args(engine_args)
         self.openai_serving_chat = None
         logger.info("LLM Engine initialized successfully.")
-        # self.keep_alive_task = self._keep_alive()
 
-    async def test_function(self):
-        return "Actor is alive!"
-
-
-    def _keep_alive(self):
-        while True:
-            time.sleep(60)
 
     async def get_chat_response(self, request_dict: dict, Response_role: str):
         try:
+            # Remove unwanted parameters
+            request_dict.pop("logprobs", None)
+            request_dict.pop("top_logprobs", None)
+
             request = ChatCompletionRequest(**request_dict)
             logger.info(f"Processing request: {request}")
 
@@ -89,7 +86,6 @@ class LLMEngineActor:
 
 
 app = FastAPI()
-actor_registry = {}
 
 @serve.deployment(name="VLLMDeployment")
 @serve.ingress(app)
@@ -100,34 +96,63 @@ class VLLMDeployment:
         self.response_role = response_role
         self.engine_actor = None  # Will hold the remote actor reference
 
-        app.add_event_handler("startup", self.startup_event)
+        self.last_request_time = time.time()  # Track last request timestamp
+        self.shutdown_timeout = 360  # Set timeout (e.g., 6 minutes)
+
+        # Start the background monitoring task
+        self._start_inactivity_monitor()
+
+        # app.add_event_handler("startup", self.startup_event)
+
+    def _start_inactivity_monitor(self):
+        """Start a background task to monitor inactivity and shut down the worker node."""
+        asyncio.create_task(self._monitor_inactivity())
+
+    async def _monitor_inactivity(self):
+        """Periodically check if the worker node has been idle for too long and shut it down."""
+        while True:
+            await asyncio.sleep(60)  # Check every 60 seconds
+            if self.engine_actor:
+                idle_time = time.time() - self.last_request_time
+                if idle_time > self.shutdown_timeout:
+                    logger.info(f"No requests received for {self.shutdown_timeout} seconds. Shutting down worker node.")
+                    ray.kill(self.engine_actor)
+                    self.engine_actor = None
+                    request_resources(bundles=[])
+                    logger.info("Worker node shut down successfully.")
 
 
     async def _ensure_engine_actor(self):
-        global actor_registry
         try:
             self.engine_actor = ray.get_actor("llm_actor")
         except ValueError:        
             request_resources(
                 bundles=[{"CPU": 2, "GPU": 1}])
-            time.sleep(60)
-            self.engine_actor = LLMEngineActor.options(
-                name="llm_actor", scheduling_strategy="SPREAD", lifetime="detached"
-            ).remote(self.engine_args)
-        actor_registry["llm_actor"] = self.engine_actor
+            while True:
+                resources = ray.available_resources()
+                if resources.get("GPU", 0) > 0:  # Check if a worker with GPU exists
+                    logger.info("Worker node detected. Initializing engine...")
+                    self.engine_actor = LLMEngineActor.options(
+                        name="llm_actor", scheduling_strategy="SPREAD", lifetime="detached"
+                    ).remote(self.engine_args)
+                    self.last_request_time = time.time()  # Reset the timer on each request
+                    logger.info("AsyncLLMEngine initialized successfully.")
+                    break
+                else:
+                    logger.info("No worker nodes yet. Waiting...")
+                    time.sleep(10)  # Wait before checking again
 
 
-
-    async def startup_event(self):
-        logger.info("Startup event triggered.")
-        await self._ensure_engine_actor()
+    # async def startup_event(self):
+    #     logger.info("Startup event triggered.")
+    #     await self._ensure_engine_actor()
 
 
     @app.post("/v1/completions")
     async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
-        logger.info(f"Received request: {request.dict()}")
         logger.info(f"Ensuring if the engine actor is UP")
         await self._ensure_engine_actor()  # Ensure the engine actor is up
+        self.last_request_time = time.time()  # Reset the timer on each request
 
         logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
         response = await self.engine_actor.get_chat_response.remote(request.dict(), self.response_role)
