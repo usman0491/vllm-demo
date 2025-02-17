@@ -172,12 +172,12 @@ class VLLMDeployment:
         return JSONResponse(content=response)
 
 
-        @app.get("/models")
-        async def list_models(self):
-            return JSONResponse(content={
-                "num_models": self.num_models,
-                "active_models": list(self.active_models)
-            })
+    @app.get("/models")
+    async def list_models(self):
+        return JSONResponse(content={
+            "num_models": self.num_models,
+            "active_models": list(self.active_models)
+        })
 
 
 def parse_vllm_args(cli_args: dict[str, str]):
