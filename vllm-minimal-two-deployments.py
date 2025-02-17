@@ -94,69 +94,72 @@ class VLLMDeployment:
         self.openai_serving_chat = None
         self.engine_args = engine_args
         self.response_role = response_role
-        self.engine_actor = None  # Will hold the remote actor reference
+        self.engine_actors = {}  # Dictionary to hold the reference/track to the model-specific actor
+        self.num_models = 0  # Track the number of active models
+        self.active_models = set()  # Track the active models names
 
-        self.last_request_time = time.time()  # Track last request timestamp
-        self.shutdown_timeout = 360  # Set timeout (e.g., 5 minutes)
+        self.last_request_time = {}  # Track last request time per model
+        self.shutdown_timeout = 360  # Set timeout (e.g., 6 minutes)
 
         # Start the background monitoring task
         self._start_inactivity_monitor()
 
-        # app.add_event_handler("startup", self.startup_event)
 
     def _start_inactivity_monitor(self):
         """Start a background task to monitor inactivity and shut down the worker node."""
         asyncio.create_task(self._monitor_inactivity())
 
+
     async def _monitor_inactivity(self):
         """Periodically check if the worker node has been idle for too long and shut it down."""
         while True:
             await asyncio.sleep(60)  # Check every 60 seconds
-            if self.engine_actor:
-                idle_time = time.time() - self.last_request_time
+            for model_name in list(self.engine_actors.keys()):
+                idle_time = time.time() - self.last_request_time.get(model_name, 0)
                 if idle_time > self.shutdown_timeout:
-                    logger.info(f"No requests received for {self.shutdown_timeout} seconds. Shutting down worker node.")
-                    ray.kill(self.engine_actor)
-                    self.engine_actor = None
-                    request_resources(bundles=[])
-                    logger.info("Worker node shut down successfully.")
+                    logger.info(f"No requests for {model_name} in {self.shutdown_timeout} seconds. Shutting down worker node for {model_name}.")
+                    ray.kill(self.engine_actors[model_name])
+                    del self.engine_actors[model_name]
+                    self.active_models.discard(model_name)
+                    self.num_models -= 1
+                    self._update_resource_request()
+                    logger.info(f"Worker node for {model_name} shut down successfully.")
 
 
-    async def _ensure_engine_actor(self):
-        try:
-            self.engine_actor = ray.get_actor("llm_actor")
-        except ValueError:        
-            request_resources(
-                bundles=[{"CPU": 2, "GPU": 1}])
+    def _update_resource_request(self):
+        request_resources(bundles=[{"CPU": 2, "GPU": 1}] * self.num_models)
+
+
+    async def _ensure_engine_actor(self, model_name: str):
+        if model_name not in self.engine_actors:
+            self.active_models.add(model_name)
+            self.num_models += 1
+            self.engine_args.model = model_name # Update model name in engine_args
+            self._update_resource_request()
             while True:
                 resources = ray.available_resources()
-                if resources.get("GPU", 0) > 0:  # Check if a worker with GPU exists
-                    logger.info("Worker node detected. Initializing engine...")
-                    self.engine_actor = LLMEngineActor.options(
-                        name="llm_actor", scheduling_strategy="SPREAD", lifetime="detached"
+                if resources.get("GPU", 0) >= self.num_models:
+                    logger.info(f"Worker node detected for model {model_name}. Initializing engine...")
+                    self.engine_actors[model_name] = LLMEngineActor.options(
+                        name=f"llm_actor_{model_name}", scheduling_strategy="SPREAD", lifetime="detached"
                     ).remote(self.engine_args)
-                    self.last_request_time = time.time()  # Reset the timer on each request
-                    logger.info("AsyncLLMEngine initialized successfully.")
+                    ############# Need to save the avtive models names along with the number of models, there should be an endpoint listing the number of active models
+                    logger.info(f"AsyncLLMEngine for {model_name} initialized successfully.")
                     break
                 else:
                     logger.info("No worker nodes yet. Waiting...")
-                    time.sleep(10)  # Wait before checking again
-
-
-    # async def startup_event(self):
-    #     logger.info("Startup event triggered.")
-    #     await self._ensure_engine_actor()
+                    time.sleep(10)
 
 
     @app.post("/v1/completions")
     async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
+        model_name = request.model # Extract model name from the request
         logger.info(f"Ensuring if the engine actor is UP")
-        await self._ensure_engine_actor()  # Ensure the engine actor is up
-        self.last_request_time = time.time()  # Reset the timer on each request
+        await self._ensure_engine_actor(model_name)  # Ensure the engine actor is up
+        self.last_request_time[model_name] = time.time() # Reset the timer on each request
 
         logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
-        response = await self.engine_actor.get_chat_response.remote(request.dict(), self.response_role)
-        # response = await self.engine_actor.test_function.remote()
+        response = await self.engine_actors[model_name].get_chat_response.remote(request.dict(), self.response_role)
         logger.info(f"Request to LLMEngineActor completed: {request.dict()}")
 
         # Handle error response
@@ -169,6 +172,12 @@ class VLLMDeployment:
         return JSONResponse(content=response)
 
 
+        @app.get("/models")
+        async def list_models(self):
+            return JSONResponse(content={
+                "num_models": self.num_models,
+                "active_models": list(self.active_models)
+            })
 
 
 def parse_vllm_args(cli_args: dict[str, str]):
