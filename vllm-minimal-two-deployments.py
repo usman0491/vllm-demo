@@ -131,24 +131,31 @@ class VLLMDeployment:
 
 
     async def _ensure_engine_actor(self, model_name: str):
-        if model_name not in self.engine_actors:
-            self.active_models.add(model_name)
-            self.num_models += 1
-            self.engine_args.model = model_name # Update model name in engine_args
-            self._update_resource_request()
-            while True:
-                resources = ray.available_resources()
-                if resources.get("GPU", 0) >= self.num_models:
-                    logger.info(f"Worker node detected for model {model_name}. Initializing engine...")
-                    self.engine_actors[model_name] = LLMEngineActor.options(
-                        name=f"llm_actor_{model_name}", scheduling_strategy="SPREAD", lifetime="detached"
-                    ).remote(self.engine_args)
-                    ############# Need to save the avtive models names along with the number of models, there should be an endpoint listing the number of active models
-                    logger.info(f"AsyncLLMEngine for {model_name} initialized successfully.")
-                    break
-                else:
-                    logger.info("No worker nodes yet. Waiting...")
-                    time.sleep(10)
+        if model_name in self.engine_actors:
+            return
+        
+        self.active_models.add(model_name)
+        self.num_models += 1
+        self.engine_args.model = model_name # Update model name in engine_args
+        self._update_resource_request()
+        
+        # Set a placeholder to indicate that the model is being initialized
+        self.engine_actors[model_name] = None
+        asyncio.create_task(self._initialize_model_async(model_name))
+
+        while True:
+            resources = ray.cluster_resources()
+            if resources.get("GPU", 0) >= self.num_models:
+                logger.info(f"Worker node detected for model {model_name}. Initializing engine...")
+                self.engine_actors[model_name] = LLMEngineActor.options(
+                    name=f"llm_actor_{model_name}", scheduling_strategy="SPREAD", lifetime="detached"
+                ).remote(self.engine_args)
+                ############# Need to save the avtive models names along with the number of models, there should be an endpoint listing the number of active models
+                logger.info(f"AsyncLLMEngine for {model_name} initialized successfully.")
+                break
+            else:
+                logger.info(f"No worker node for {model_name} yet, number of models = {self.num_models}, resources = {resources}")
+                time.sleep(10)
 
 
     @app.post("/v1/completions")
