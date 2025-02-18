@@ -133,9 +133,10 @@ class VLLMDeployment:
     async def _ensure_engine_actor(self, model_name: str):
         if model_name in self.engine_actors:
             return
+
         
         # Set last request time to the current time to avoid immediate shutdown
-        self.last_request_time[model_name] = time.time()
+        self.last_request_time[model_name] = time.time() + 300  # Set to 5 minutes in the future to add more time for initialization
         
         self.active_models.add(model_name)
         self.num_models += 1
@@ -144,9 +145,9 @@ class VLLMDeployment:
         
         # Set a placeholder to indicate that the model is being initialized
         self.engine_actors[model_name] = None
-        asyncio.create_task(self._initialize_model_async(model_name))
+        asyncio.create_task(self._monitor_resources_and_initialize(model_name))
 
-    async def _initialize_model_async(self, model_name: str):
+    async def _monitor_resources_and_initialize(self, model_name: str):
         logger.info(f"Waiting for worker node to become available for model {model_name}...")
         while True:
             resources = ray.cluster_resources()
@@ -159,7 +160,7 @@ class VLLMDeployment:
                 break
             else:
                 logger.info(f"No worker node for {model_name} yet, number of models = {self.num_models}, resources = {resources}")
-                time.sleep(10)
+                await asyncio.sleep(10)
 
 
     @app.post("/v1/completions")
