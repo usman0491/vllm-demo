@@ -134,6 +134,10 @@ class VLLMDeployment:
         if model_name in self.engine_actors:
             return
 
+        
+        # Set last request time to the current time to avoid immediate shutdown
+        self.last_request_time[model_name] = time.time() + 300  # Set to 5 minutes in the future to add more time for initialization
+        
         self.active_models.add(model_name)
         self.num_models += 1
         self.engine_args.model = model_name # Update model name in engine_args
@@ -152,8 +156,6 @@ class VLLMDeployment:
                 self.engine_actors[model_name] = LLMEngineActor.options(
                     name=f"llm_actor_{model_name}", scheduling_strategy="SPREAD", lifetime="detached"
                 ).remote(self.engine_args)
-                # Set last request time to the current time to avoid immediate shutdown
-                self.last_request_time[model_name] = time.time() + 300  # Set to 5 minutes in the future to add more time for initialization
                 logger.info(f"AsyncLLMEngine for {model_name} initialized successfully.")
                 break
             else:
