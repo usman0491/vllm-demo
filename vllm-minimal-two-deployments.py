@@ -24,9 +24,9 @@ from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
 from vllm.entrypoints.openai.serving_engine import LoRAModulePath
 from vllm.utils import FlexibleArgumentParser
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")
+
 
 @ray.remote  # Ensure it runs on a GPU worker node (num_cpus=1, num_gpus=1)
 class LLMEngineActor:
@@ -86,7 +86,6 @@ class LLMEngineActor:
 
 
 app = FastAPI()
-
 @serve.deployment(name="VLLMDeployment")
 @serve.ingress(app)
 class VLLMDeployment:
@@ -133,7 +132,6 @@ class VLLMDeployment:
     async def _ensure_engine_actor(self, model_name: str):
         if model_name in self.engine_actors:
             return
-
         
         # Set last request time to the current time to avoid immediate shutdown
         self.last_request_time[model_name] = time.time() + 300  # Set to 5 minutes in the future to add more time for initialization
@@ -146,6 +144,7 @@ class VLLMDeployment:
         # Set a placeholder to indicate that the model is being initialized
         self.engine_actors[model_name] = None
         asyncio.create_task(self._monitor_resources_and_initialize(model_name))
+
 
     async def _monitor_resources_and_initialize(self, model_name: str):
         logger.info(f"Waiting for worker node to become available for model {model_name}...")
@@ -162,10 +161,26 @@ class VLLMDeployment:
                 logger.info(f"No worker node for {model_name} yet, number of models = {self.num_models}, resources = {resources}")
                 await asyncio.sleep(10)
 
+    allowed_models = {
+        "meta-llama/Meta-Llama-3-8B",
+        "meta-llama/Meta-Llama-3-8B-Instruct",
+        "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+    }
 
     @app.post("/v1/completions")
     async def create_chat_completion(self, request: ChatCompletionRequest, raw_request: Request):
         model_name = request.model # Extract model name from the request
+
+        # Validate model name against the allowed list
+        if model_name not in self.allowed_models:
+            return JSONResponse(
+                content={
+                    "error": "Invalid model selection. Please choose from the allowed models.",
+                    "Allowed Models": list(self.allowed_models)
+                },
+                status_code=400
+            )
+
         logger.info(f"Ensuring if the engine actor is UP")
         await self._ensure_engine_actor(model_name)  # Ensure the engine actor is up
 
@@ -212,6 +227,7 @@ def parse_vllm_args(cli_args: dict[str, str]):
         logger.error(f"Failed to parse CLI arguments: {e}", exc_info=True)
         raise
 
+
 def build_app(cli_args: Dict[str, str]) -> serve.Application:
     try:
         logger.info(f"Building app with CLI arguments: {cli_args}")
@@ -223,6 +239,7 @@ def build_app(cli_args: Dict[str, str]) -> serve.Application:
     except Exception as e:
         logger.error(f"Failed to build application: {e}", exc_info=True)
         raise
+
 
 try:
     model = build_app({
