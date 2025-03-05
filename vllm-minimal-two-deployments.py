@@ -86,8 +86,10 @@ class LLMEngineActor:
 
 
 app = FastAPI()
-app.router.redirect_slashes = False
-@serve.deployment(name="VLLMDeployment", route_prefix="/", health_check_timeout_s=300)
+@serve.deployment(name="VLLMDeployment")
+# app.router.redirect_slashes = False
+# @serve.deployment(name="VLLMDeployment", route_prefix="/", health_check_timeout_s=300)
+
 @serve.ingress(app)
 class VLLMDeployment:
     def __init__(self, engine_args: AsyncEngineArgs, response_role: str):
