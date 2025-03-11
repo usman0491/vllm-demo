@@ -7,11 +7,21 @@ spec:
   # serveConfigV2 takes a yaml multi-line scalar, which should be a Ray Serve multi-application config. See https://docs.ray.io/en/latest/serve/multi-app.html.
   # working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-deploy-2.zip"
   # working_dir: "https://github.com/EmumbaOrg/emumba-llm/raw/refs/heads/main/kuberay/vllm-deployment.zip"
+  # working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-deployment.zip"
+  # working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-scaling-deployment.zip"
+  # working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-two-deployments.zip"
+  # working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-minimal-two-deployments.zip"
+
 
   serveConfigV2: |
     applications:
     - name: vllm_service
-      import_path: vllm-deployment:model
+      import_path: vllm-minimal-two-deployments:model
+      deployments:
+      - name: VLLMDeployment
+        num_replicas: 1
+        # ray_actor_options:
+        #   num_cpus: 1
       route_prefix: /
       runtime_env:
         env_vars:
@@ -21,7 +31,7 @@ spec:
           MODEL_ID: "meta-llama/Meta-Llama-3-8B-Instruct"
           TENSOR_PARALLELISM: "1"
           PIPELINE_PARALLELISM: "1"
-        working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-deployment.zip"
+        working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-minimal-two-deployments.zip"
         pip: ["vllm==0.5.4", "typer==0.12.3", "rich==13.3.3", "jinja2>=3.1.0"]
         
 # deployments:
@@ -45,9 +55,11 @@ spec:
       # The `rayStartParams` are used to configure the `ray start` command.
       # See https://github.com/ray-project/kuberay/blob/master/docs/guidance/rayStartParams.md for the default settings of `rayStartParams` in KubeRay.
       # See https://docs.ray.io/en/latest/cluster/cli.html#ray-start for all available options in `rayStartParams`.
+      serviceType: NodePort
       rayStartParams:
         dashboard-host: '0.0.0.0'
-        num-cpus: "0"
+        # node-ip-address: '0.0.0.0'
+        num-cpus: "1"
       #pod template
       template:
         spec:
@@ -111,11 +123,11 @@ spec:
                 resources:
                   limits:
                     cpu: "2"
-                    memory: "10Gi"
+                    memory: "20Gi"
                     nvidia.com/gpu: "1"
                   requests:
                     cpu: "2"
-                    memory: "10Gi"
+                    memory: "20Gi"
                     nvidia.com/gpu: "1"
             tolerations:
               - key: nvidia.com/gpu
