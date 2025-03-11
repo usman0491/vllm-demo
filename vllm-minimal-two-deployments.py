@@ -213,7 +213,8 @@ class VLLMDeployment:
     async def list_models(self):
         return JSONResponse(content={
             "num_models": self.num_models,
-            "active_models": list(self.active_models)
+            "active_models": list(self.active_models),
+            "allowed_models": list(self.allowed_models)
         })
 
 
