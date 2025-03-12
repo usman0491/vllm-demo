@@ -55,7 +55,7 @@ spec:
       # The `rayStartParams` are used to configure the `ray start` command.
       # See https://github.com/ray-project/kuberay/blob/master/docs/guidance/rayStartParams.md for the default settings of `rayStartParams` in KubeRay.
       # See https://docs.ray.io/en/latest/cluster/cli.html#ray-start for all available options in `rayStartParams`.
-      serviceType: NodePort
+    #   serviceType: NodePort
       rayStartParams:
         dashboard-host: '0.0.0.0'
         # node-ip-address: '0.0.0.0'
