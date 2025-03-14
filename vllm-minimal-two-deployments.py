@@ -101,7 +101,7 @@ class VLLMDeployment:
         self.active_models = set()  # Track the active models names
 
         self.last_request_time = {}  # Track last request time per model
-        self.shutdown_timeout = 10  # Set timeout (e.g., 30 minutes)
+        self.shutdown_timeout = 600  # Set timeout (e.g., 30 minutes)
 
         # Start the background monitoring task
         self._start_inactivity_monitor()
