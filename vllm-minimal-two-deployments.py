@@ -55,12 +55,18 @@ class LLMEngineActor:
 
                 #served_model_names = self.engine_args.served_model_name or [self.engine_args.model]
                 # models = await self.engine.get_models()
+                class DummyModel:
+                    def __init__(self, name):
+                        self.name = name
+                        self.is_base_model = True
+
+                models = [DummyModel(self.engine_args.model)]
 
                 self.openai_serving_chat = OpenAIServingChat(
                     self.engine,
                     model_config,
                     #served_model_names=served_model_names,
-                    models=None,
+                    models,
                     response_role = Response_role,
                     #lora_modules=[],  # Dummy value for LoRA modules
                     # prompt_adapters=None,  # Dummy value for prompt adapters
