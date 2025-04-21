@@ -58,7 +58,7 @@ class LLMEngineActor:
                     self.engine,
                     model_config,
                     #served_model_names=served_model_names,
-                    models=self.engine_args.model,
+                    models=await self.engine.get_models(),
                     response_role = Response_role,
                     #lora_modules=[],  # Dummy value for LoRA modules
                     # prompt_adapters=None,  # Dummy value for prompt adapters
