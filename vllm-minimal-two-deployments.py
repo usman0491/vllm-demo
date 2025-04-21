@@ -57,7 +57,7 @@ class LLMEngineActor:
                 self.openai_serving_chat = OpenAIServingChat(
                     self.engine,
                     model_config,
-                    served_model_names=served_model_names,
+                    #served_model_names=served_model_names,
                     response_role = Response_role,
                     lora_modules=[],  # Dummy value for LoRA modules
                     prompt_adapters=None,  # Dummy value for prompt adapters
