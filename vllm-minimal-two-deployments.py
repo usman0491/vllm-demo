@@ -60,7 +60,7 @@ class LLMEngineActor:
                         self.name = name
                         self.is_base_model = True
 
-                models = [DummyModel(self.engine_args.model)]
+                models = DummyModel(self.engine_args.model)
 
                 self.openai_serving_chat = OpenAIServingChat(
                     self.engine,
