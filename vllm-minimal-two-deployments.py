@@ -58,7 +58,7 @@ class LLMEngineActor:
                 class DummyModel:
                     def __init__(self, name):
                         self.name = name
-                    def is_base_model(self):
+                    def is_base_model(self, *args, **kwargs):
                         return True
 
                 models = DummyModel(self.engine_args.model)
