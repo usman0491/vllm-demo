@@ -64,6 +64,13 @@ class LLMEngineActor:
                     # prompt_adapters=None,  # Dummy value for prompt adapters
                     request_logger=None,  # Dummy value for request logger
                     chat_template=None,  # Dummy value for chat template
+                    chat_template_content_format=None,
+                    # return_tokens_as_token_ids: bool = False,
+                    # enable_reasoning: bool = False,
+                    # reasoning_parser: Optional[str] = None,
+                    # enable_auto_tools: bool = False,
+                    # tool_parser: Optional[str] = None,
+                    # enable_prompt_tokens_details: bool = False,
                 )
                 logger.info(f"OpenAIServingChat initialized.")
                 
