@@ -268,6 +268,7 @@ try:
         "model": os.environ.get('MODEL_ID', 'default-model-id'),
         "tensor-parallel-size": os.environ.get('TENSOR_PARALLELISM', '1'),
         "pipeline-parallel-size": os.environ.get('PIPELINE_PARALLELISM', '1'),
+        "mm-models": "meta-llama/Llama-3.2-11B-Vision-Instruct",
     })
     logger.info("Model deployment initialized successfully.")
 except Exception as e:
