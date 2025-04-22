@@ -159,6 +159,8 @@ class VLLMDeployment:
         self.active_models.add(model_name)
         self.num_models += 1
         self.engine_args.model = model_name # Update model name in engine_args
+        self.engine_args.image_input_type = "dummy"
+        self.engine_args.trust_remote_code = True
         self._update_resource_request()
         
         # Set a placeholder to indicate that the model is being initialized
