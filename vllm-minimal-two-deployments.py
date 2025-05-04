@@ -256,8 +256,8 @@ def build_app(cli_args: Dict[str, str]) -> serve.Application:
     try:
         logger.info(f"Building app with CLI arguments: {cli_args}")
         parsed_args = parse_vllm_args(cli_args)
-        if isinstance(parsed_args.enable_multimodal, str):
-            parsed_args.enable_multimodal = parsed_args.enable_multimodal.lower() == "true"
+        # if isinstance(parsed_args.enable_multimodal, str):
+        #     parsed_args.enable_multimodal = parsed_args.enable_multimodal.lower() == "true"
         
         engine_args = AsyncEngineArgs.from_cli_args(parsed_args)
         engine_args.worker_use_ray = True
