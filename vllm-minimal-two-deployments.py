@@ -187,7 +187,8 @@ class VLLMDeployment:
         "meta-llama/Meta-Llama-3-8B",
         "meta-llama/Meta-Llama-3-8B-Instruct",
         "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
-        "meta-llama/Llama-3.2-11B-Vision-Instruct"
+        "meta-llama/Llama-3.2-11B-Vision-Instruct",
+        "meta-llama/Llama-Guard-3-11B-Vision",
     }
 
     @app.post("/v1/completions")
