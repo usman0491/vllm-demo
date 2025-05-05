@@ -256,9 +256,7 @@ def build_app(cli_args: Dict[str, str]) -> serve.Application:
     try:
         logger.info(f"Building app with CLI arguments: {cli_args}")
         parsed_args = parse_vllm_args(cli_args)
-        # if isinstance(parsed_args.enable_multimodal, str):
-        #     parsed_args.enable_multimodal = parsed_args.enable_multimodal.lower() == "true"
-        
+
         engine_args = AsyncEngineArgs.from_cli_args(parsed_args)
         engine_args.worker_use_ray = True
         logger.info("Application built successfully.")
@@ -273,7 +271,6 @@ try:
         "model": os.environ.get('MODEL_ID', 'default-model-id'),
         "tensor-parallel-size": os.environ.get('TENSOR_PARALLELISM', '1'),
         "pipeline-parallel-size": os.environ.get('PIPELINE_PARALLELISM', '1'),
-        "enable_multimodal": "True",
     })
     logger.info("Model deployment initialized successfully.")
 except Exception as e:
