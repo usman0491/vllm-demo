@@ -86,6 +86,7 @@ class VLLMDeployment:
         self,
         model: str,
         tensor_parallel_size: int,
+        pipeline_parallel_size: int,
         max_num_seqs: int,
         max_model_len: int,
     ):
@@ -97,6 +98,7 @@ class VLLMDeployment:
         self.engine_args = AsyncEngineArgs(
             model=model,
             tensor_parallel_size=tensor_parallel_size,
+            pipeline_parallel_size=pipeline_parallel_size,
             max_num_seqs=max_num_seqs,
             max_model_len=max_model_len,
             disable_log_requests=True,
