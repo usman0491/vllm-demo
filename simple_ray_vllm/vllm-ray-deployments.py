@@ -20,8 +20,6 @@ from vllm.entrypoints.openai.protocol import (
     ErrorResponse,
 )
 from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
-from vllm.entrypoints.openai.serving_engine import LoRAModulePath
-from vllm.transformers_utils.config import get_config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")

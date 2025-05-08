@@ -24,7 +24,7 @@ spec:
           MAX_MODEL_LEN: "64000"
           MAX_NUM_SEQ: "10"
           MAX_NUM_BATCHED_TOKENS: "32000"
-        # working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-ray-deployments.zip"
+        working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/simple_ray_vllm/vllm-ray-deployments.zip"
         pip: ["vllm==0.8.4", "typer==0.12.3", "rich==13.3.3", "jinja2>=3.1.0"] 
 
       deployments:
