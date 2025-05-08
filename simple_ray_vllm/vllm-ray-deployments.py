@@ -1,7 +1,7 @@
 import os
 import time
 import logging
-from typing import Dict
+from typing import Dict, List, Optional
 import asyncio
 
 from fastapi import FastAPI, HTTPException
@@ -14,15 +14,14 @@ from ray.autoscaler.sdk import request_resources
 
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.engine.async_llm_engine import AsyncLLMEngine
-from vllm.entrypoints.openai.cli_args import make_arg_parser
 from vllm.entrypoints.openai.protocol import (
     ChatCompletionRequest,
     ChatCompletionResponse,
     ErrorResponse,
 )
 from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
-# from vllm.entrypoints.openai.serving_engine import LoRAModulePath
-from vllm.utils import FlexibleArgumentParser
+from vllm.entrypoints.openai.serving_engine import LoRAModulePath
+from vllm.transformers_utils.config import get_config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")
@@ -32,60 +31,38 @@ logger = logging.getLogger("ray.serve")
 class LLMEngineActor:
     def __init__(self, engine_args: AsyncEngineArgs):
         logger.info("Initializing LLM Engine on a worker node...")
-        self.engine_args = engine_args
-        self.engine = AsyncLLMEngine.from_engine_args(engine_args)
         self.openai_serving_chat = None
+        self.engine_args = engine_args
+        self.response_role = str = "assistant"
+        self.lora_modules = Optional[List[LoRaModulePath]] = None
+        self.chat_template = Optional[str] = None
+
+        self.engine = AsyncLLMEngine.from_engine_args(engine_args)
         logger.info("LLM Engine initialized successfully.")
 
 
-    async def get_chat_response(self, request_dict: dict, Response_role: str):
+    async def get_chat_response(self, request_dict: dict, raw_request: Request):
         try:
-            # Remove unwanted parameters
-            request_dict.pop("logprobs", None)
-            request_dict.pop("top_logprobs", None)
-
             request = ChatCompletionRequest(**request_dict)
-            logger.info(f"Processing request: {request}")
-
-            # Ensure OpenAIServingChat is initialized
             if not self.openai_serving_chat:
                 logger.info("Initializing OpenAIServingChat...")
                 model_config = await self.engine.get_model_config()
+                served_model_names = [self.engine_args.model]
                 logger.info(f"Model config retrieved: {model_config}")
-
-                #served_model_names = self.engine_args.served_model_name or [self.engine_args.model]
-                # models = await self.engine.get_models()
-                class DummyModel:
-                    def __init__(self, name):
-                        self.name = name
-                    def is_base_model(self, *args, **kwargs):
-                        return True
-
-                models = DummyModel(self.engine_args.model)
 
                 self.openai_serving_chat = OpenAIServingChat(
                     self.engine,
                     model_config,
-                    #served_model_names=served_model_names,
-                    models,
-                    response_role = Response_role,
-                    #lora_modules=[],  # Dummy value for LoRA modules
-                    # prompt_adapters=None,  # Dummy value for prompt adapters
-                    request_logger=None,  # Dummy value for request logger
-                    chat_template=None,  # Dummy value for chat template
-                    chat_template_content_format=None,
-                    # return_tokens_as_token_ids: bool = False,
-                    # enable_reasoning: bool = False,
-                    # reasoning_parser: Optional[str] = None,
-                    # enable_auto_tools: bool = False,
-                    # tool_parser: Optional[str] = None,
-                    # enable_prompt_tokens_details: bool = False,
+                    served_model_names,
+                    self.response_role,
+                    self.lora_modules,
+                    self.chat_template,
                 )
                 logger.info(f"OpenAIServingChat initialized.")
                 
             # Call the chat completion function
             logger.info("Calling create_chat_completion()...")
-            generator = await self.openai_serving_chat.create_chat_completion(request)
+            generator = await self.openai_serving_chat.create_chat_completion(request, raw_request)
             logger.info("create_chat_completion() executed successfully.")
 
             # Handle errors
@@ -104,30 +81,37 @@ class LLMEngineActor:
 
 app = FastAPI()
 @serve.deployment(name="VLLMDeployment")
-# app.router.redirect_slashes = False
-# @serve.deployment(name="VLLMDeployment", route_prefix="/", health_check_timeout_s=300)
-
 @serve.ingress(app)
+
 class VLLMDeployment:
-    def __init__(self, engine_args: AsyncEngineArgs, response_role: str):
-        self.openai_serving_chat = None
-        self.engine_args = engine_args
-        self.response_role = response_role
+    def __init__(
+        self,
+        model: str,
+        tensor_parallel_size: int,
+        max_num_seqs: int,
+        max_model_len: int,
+    ):
         self.engine_actors = {}  # Dictionary to hold the reference/track to the model-specific actor
         self.num_models = 0  # Track the number of active models
         self.active_models = set()  # Track the active models names
-
         self.last_request_time = {}  # Track last request time per model
         self.shutdown_timeout = 600  # Set timeout (e.g., 30 minutes)
+        self.engine_args = AsyncEngineArgs(
+            model=model,
+            tensor_parallel_size=tensor_parallel_size,
+            max_num_seqs=max_num_seqs,
+            max_model_len=max_model_len,
+            disable_log_requests=True,
+            dtype="auto",
+            trust_remote_code=True  # Add this to allow loading custom model code
+        )
 
         # Start the background monitoring task
         self._start_inactivity_monitor()
 
-
     def _start_inactivity_monitor(self):
         """Start a background task to monitor inactivity and shut down the worker node."""
         asyncio.create_task(self._monitor_inactivity())
-
 
     async def _monitor_inactivity(self):
         """Periodically check if the worker node has been idle for too long and shut it down."""
@@ -144,10 +128,8 @@ class VLLMDeployment:
                     self._update_resource_request()
                     logger.info(f"Worker node for {model_name} shut down successfully.")
 
-
     def _update_resource_request(self):
         request_resources(bundles=[{"CPU": 2, "GPU": 1}] * self.num_models)
-
 
     async def _ensure_engine_actor(self, model_name: str):
         if model_name in self.engine_actors:
@@ -159,7 +141,6 @@ class VLLMDeployment:
         self.active_models.add(model_name)
         self.num_models += 1
         self.engine_args.model = model_name # Update model name in engine_args
-        self.engine_args.image_input_type = "base64"
         self.engine_args.trust_remote_code = True
         self._update_resource_request()
         
@@ -217,7 +198,7 @@ class VLLMDeployment:
         self.last_request_time[model_name] = time.time() # Reset the timer on each request
 
         logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
-        response = await self.engine_actors[model_name].get_chat_response.remote(request.dict(), self.response_role)
+        response = await self.engine_actors[model_name].get_chat_response.remote(request.dict(), raw_request)
         logger.info(f"Request to LLMEngineActor completed: {request.dict()}")
 
         # Handle error response
@@ -238,42 +219,10 @@ class VLLMDeployment:
             "allowed_models": list(self.allowed_models)
         })
 
-
-def parse_vllm_args(cli_args: dict[str, str]):
-    try:
-        logger.info(f"Parsing CLI arguments: {cli_args}")
-        parser = FlexibleArgumentParser(description="vLLM CLI")
-        parser = make_arg_parser(parser)
-        arg_strings = [f"--{key}={value}" for key, value in cli_args.items()]
-        parsed_args = parser.parse_args(args=arg_strings)
-        logger.info("CLI arguments parsed successfully.")
-        return parsed_args
-    except Exception as e:
-        logger.error(f"Failed to parse CLI arguments: {e}", exc_info=True)
-        raise
-
-
-def build_app(cli_args: Dict[str, str]) -> serve.Application:
-    try:
-        logger.info(f"Building app with CLI arguments: {cli_args}")
-        parsed_args = parse_vllm_args(cli_args)
-
-        engine_args = AsyncEngineArgs.from_cli_args(parsed_args)
-        engine_args.worker_use_ray = True
-        logger.info("Application built successfully.")
-        return VLLMDeployment.bind(engine_args, parsed_args.response_role)
-    except Exception as e:
-        logger.error(f"Failed to build application: {e}", exc_info=True)
-        raise
-
-
-try:
-    model = build_app({
-        "model": os.environ.get('MODEL_ID', 'default-model-id'),
-        "tensor-parallel-size": os.environ.get('TENSOR_PARALLELISM', '1'),
-        "pipeline-parallel-size": os.environ.get('PIPELINE_PARALLELISM', '1'),
-    })
-    logger.info("Model deployment initialized successfully.")
-except Exception as e:
-    logger.critical(f"Model deployment failed: {e}", exc_info=True)
-    raise
+deployment = VLLMDeployment.bind(
+    model=os.environ.get('MODEL_ID', 'default-model-id'),
+    tensor_parallel_size=int(os.environ.get('TENSOR_PARALLELISM', '1')),
+    pipeline_parallel_size=int(os.environ.get('PIPELINE_PARALLELISM', '1')),
+    max_num_seqs=int(os.environ.get('MAX_NUM_SEQS', '10')),
+    max_model_len=int(os.environ.get('MAX_MODEL_LEN', '64000')),
+)

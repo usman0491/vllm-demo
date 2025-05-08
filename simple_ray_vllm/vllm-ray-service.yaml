@@ -1,48 +1,38 @@
 apiVersion: ray.io/v1
 kind: RayService
 metadata:
-  name: vllm-demo-service
+  name: rayserve-vllm
   namespace: ray-system
 spec:
-  # serveConfigV2 takes a yaml multi-line scalar, which should be a Ray Serve multi-application config. See https://docs.ray.io/en/latest/serve/multi-app.html.
-  # working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-deploy-2.zip"
-  # working_dir: "https://github.com/EmumbaOrg/emumba-llm/raw/refs/heads/main/kuberay/vllm-deployment.zip"
-  # working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-deployment.zip"
-  # working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-scaling-deployment.zip"
-  # working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-two-deployments.zip"
-  # working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-minimal-two-deployments.zip"
-
-
+  serviceUnhealthySecondThreshold: 1800 # Config for the health check threshold for service. Default value is 60.
+  deploymentUnhealthySecondThreshold: 1800 # Config for the health check threshold for deployments. Default value is 60.
+  
   serveConfigV2: |
     applications:
-    - name: vllm_service
-      import_path: vllm-minimal-two-deployments:model
+    - name: vllm_inference
+      import_path: vllm-ray-deployments:deployment
+      runtime_env:
+        env_vars:
+          RAY_LOG_TO_STDERR: "1"
+          RAY_SERVE_LOGGING_LEVEL: DEBUG
+          # HUGGING_FACE_HUB_TOKEN: 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
+          MODEL_ID: "meta-llama/Meta-Llama-3-8B-Instruct"
+          TENSOR_PARALLELISM: "1"
+          PIPELINE_PARALLELISM: "1"
+          LD_LIBRARY_PATH: "/home/ray/anaconda3/lib:$LD_LIBRARY_PATH"
+          GPU_MEMORY_UTILIZATION: "0.9"
+          MAX_MODEL_LEN: "64000"
+          MAX_NUM_SEQ: "10"
+          MAX_NUM_BATCHED_TOKENS: "32000"
+        # working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-ray-deployments.zip"
+        pip: ["vllm==0.8.4", "typer==0.12.3", "rich==13.3.3", "jinja2>=3.1.0"] 
+
       deployments:
       - name: VLLMDeployment
         num_replicas: 1
         # ray_actor_options:
         #   num_cpus: 1
-      route_prefix: /
-      runtime_env:
-        env_vars:
-          RAY_LOG_TO_STDERR: "1"
-          RAY_SERVE_LOGGING_LEVEL: DEBUG
-          HUGGING_FACE_HUB_TOKEN: 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
-          MODEL_ID: "meta-llama/Meta-Llama-3-8B-Instruct"
-          MM_MODELS: "meta-llama/Llama-3.2-11B-Vision-Instruct"
-          TENSOR_PARALLELISM: "1"
-          PIPELINE_PARALLELISM: "1"
-        working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/vllm-ray-deployments.zip"
-        pip: ["vllm==0.8.4", "typer==0.12.3", "rich==13.3.3", "jinja2>=3.1.0"] 
-## ["vllm==0.8.4", "ray==2.43.0", "typer==0.12.3", "rich==13.3.3", "jinja2>=3.1.0", "torch==2.6.0", "transformers==4.51.1"]
-        
-# deployments:
-# - name: VLLMDeployment
-# num_replicas: 1
-# max_replicas_per_node: 1
-# ray_actor_options:
-#     resources:
-#     head_node: 0
+      route_prefix: /        
 
   rayClusterConfig:
     rayVersion: '2.43.0' # should match the Ray version in the image of the containers
@@ -52,12 +42,13 @@ spec:
       upscalingMode: Default
       idleTimeoutSeconds: 60
       
-    # Ray head pod template.
     headGroupSpec:
-      # The `rayStartParams` are used to configure the `ray start` command.
-      # See https://github.com/ray-project/kuberay/blob/master/docs/guidance/rayStartParams.md for the default settings of `rayStartParams` in KubeRay.
-      # See https://docs.ray.io/en/latest/cluster/cli.html#ray-start for all available options in `rayStartParams`.
+      headService:
+        metadata:
+          name: vllm
+          namespace: ray-system
     #   serviceType: NodePort
+
       rayStartParams:
         dashboard-host: '0.0.0.0'
         # node-ip-address: '0.0.0.0'
@@ -70,6 +61,11 @@ spec:
           containers:
             - name: ray-head
               image: rayproject/ray-llm:2.43.0-py311-cu124 # rayproject/ray-ml:2.43.0.deprecated-py310-gpu
+              imagePullPolicy: IfNotPresent
+              lifecycle:
+                preStop:
+                  exec:
+                    command: ["/bin/sh", "-c", "ray stop"]
               resources:
                 limits:
                   cpu: 2
@@ -93,18 +89,13 @@ spec:
                       name: hf-secret
                       key: hf_api_token
     workerGroupSpecs:
-      # the pod replicas in this group typed worker
       - replicas: 0
         minReplicas: 0
         maxReplicas: 2
         # logical group name, for this called small-group, also can be functional
-        groupName: vllm-group
-        # The `rayStartParams` are used to configure the `ray start` command.
-        # See https://github.com/ray-project/kuberay/blob/master/docs/guidance/rayStartParams.md for the default settings of `rayStartParams` in KubeRay.
-        # See https://docs.ray.io/en/latest/cluster/cli.html#ray-start for all available options in `rayStartParams`.
+        groupName: gpu-group
+
         rayStartParams: {}
-        #   resources: '{"worker": 1}'
-        #pod template
         template:
           spec:
             nodeSelector:
