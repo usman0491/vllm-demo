@@ -61,7 +61,7 @@ class LLMEngineActor:
                 
             # Call the chat completion function
             logger.info("Calling create_chat_completion()...")
-            generator = await self.openai_serving_chat.create_chat_completion(request, raw_request)
+            generator = await self.openai_serving_chat.create_chat_completion(request)
             logger.info("create_chat_completion() executed successfully.")
 
             # Handle errors
