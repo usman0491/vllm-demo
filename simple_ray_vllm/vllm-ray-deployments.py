@@ -40,7 +40,7 @@ class LLMEngineActor:
         logger.info("LLM Engine initialized successfully.")
 
 
-    async def get_chat_response(self, request_dict: dict, raw_request: Request):
+    async def get_chat_response(self, request_dict: dict):
         try:
             request = ChatCompletionRequest(**request_dict)
             if not self.openai_serving_chat:
@@ -199,7 +199,7 @@ class VLLMDeployment:
         self.last_request_time[model_name] = time.time() # Reset the timer on each request
 
         logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
-        response = await self.engine_actors[model_name].get_chat_response.remote(request.dict(), raw_request)
+        response = await self.engine_actors[model_name].get_chat_response.remote(request.dict())
         logger.info(f"Request to LLMEngineActor completed: {request.dict()}")
 
         # Handle error response
