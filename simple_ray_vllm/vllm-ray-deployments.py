@@ -20,6 +20,7 @@ from vllm.entrypoints.openai.protocol import (
     ErrorResponse,
 )
 from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
+from vllm.entrypoints.openai.serving_engine import LoRAModulePath
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")
@@ -32,7 +33,7 @@ class LLMEngineActor:
         self.openai_serving_chat = None
         self.engine_args = engine_args
         self.response_role = str = "assistant"
-        self.lora_modules = Optional[List[LoRaModulePath]] = None
+        self.lora_modules = Optional[List[LoRAModulePath]] = None
         self.chat_template = Optional[str] = None
 
         self.engine = AsyncLLMEngine.from_engine_args(engine_args)
