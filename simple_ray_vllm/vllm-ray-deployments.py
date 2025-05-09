@@ -32,7 +32,7 @@ class LLMEngineActor:
         logger.info("Initializing LLM Engine on a worker node...")
         self.openai_serving_chat = None
         self.engine_args = engine_args
-        self.response_role = str = "assistant"
+        self.response_role: str = "assistant"
         self.lora_modules = Optional[List[LoRAModulePath]] = None
         self.chat_template = Optional[str] = None
 
