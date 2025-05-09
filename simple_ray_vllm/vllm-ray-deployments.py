@@ -34,7 +34,7 @@ class LLMEngineActor:
         self.engine_args = engine_args
         self.response_role: str = "assistant"
         self.lora_modules = None # Optional[List[LoRAModulePath]] = None
-        self.chat_template = Optional[str] = None
+        self.chat_template = None
 
         self.engine = AsyncLLMEngine.from_engine_args(engine_args)
         logger.info("LLM Engine initialized successfully.")
