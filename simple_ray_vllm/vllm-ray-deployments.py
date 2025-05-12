@@ -61,7 +61,6 @@ class LLMEngineActor:
                 models = DummyModel(self.engine_args.model)
 
                 self.openai_serving_chat = OpenAIServingChat(
-                    self,
                     self.engine,
                     model_config,
                     models,
