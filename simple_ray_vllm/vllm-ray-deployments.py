@@ -20,6 +20,9 @@ from vllm.entrypoints.openai.protocol import (
     ErrorResponse,
 )
 from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
+
+from vllm.logger import RequestLogger
+
 # from vllm.entrypoints.openai.serving_engine import LoRAModulePath
 
 logging.basicConfig(level=logging.INFO)
@@ -50,10 +53,13 @@ class LLMEngineActor:
                 logger.info(f"Model config retrieved: {model_config}")
 
                 self.openai_serving_chat = OpenAIServingChat(
-                    self.engine,
-                    model_config,
-                    served_model_names,
-                    self.response_role,
+                    engine=self.engine,
+                    model_config=model_config,
+                    served_model_names=served_model_names,
+                    response_roles=self.response_role,
+                    request_logger=RequestLogger(),
+                    chat_template=None,
+                    chat_template_contenct_format="auto",
                 )
                 logger.info(f"OpenAIServingChat initialized.")
                 
