@@ -54,8 +54,6 @@ class LLMEngineActor:
                     model_config,
                     served_model_names,
                     self.response_role,
-                    self.lora_modules,
-                    self.chat_template,
                 )
                 logger.info(f"OpenAIServingChat initialized.")
                 
