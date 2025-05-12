@@ -53,9 +53,10 @@ class LLMEngineActor:
                 logger.info(f"Model config retrieved: {model_config}")
 
                 self.openai_serving_chat = OpenAIServingChat(
-                    engine=self.engine,
+                    self,
+                    engine_client=self.engine,
                     model_config=model_config,
-                    served_model_names=served_model_names,
+                    models=served_model_names,
                     response_roles=self.response_role,
                     request_logger=None,
                     chat_template=None,
