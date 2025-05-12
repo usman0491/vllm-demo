@@ -65,7 +65,7 @@ class LLMEngineActor:
                     self.engine,
                     model_config,
                     models,
-                    response_role=self.response_role,
+                    self.response_role,
                     request_logger=None,
                     chat_template=None,
                     chat_template_content_format=None,
