@@ -111,8 +111,9 @@ class VLLMDeployment:
             model=model,
             tensor_parallel_size=tensor_parallel_size,
             pipeline_parallel_size=pipeline_parallel_size,
-            # max_num_seqs=max_num_seqs,
+            max_num_seqs=12
             max_model_len=4096,
+            enforce_eager=True,
             disable_log_requests=True,
             dtype="auto",
             trust_remote_code=True,  # Add this to allow loading custom model code
