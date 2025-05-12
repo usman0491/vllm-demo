@@ -52,15 +52,23 @@ class LLMEngineActor:
                 served_model_names = [self.engine_args.model]
                 logger.info(f"Model config retrieved: {model_config}")
 
+                class DummyModel:
+                    def __init__(self, name):
+                        self.name = name
+                    def is_base_model(self, *args, **kwargs):
+                        return True
+
+                models = DummyModel(self.engine_args.model)
+
                 self.openai_serving_chat = OpenAIServingChat(
                     self,
-                    engine_client=self.engine,
-                    model_config=model_config,
-                    models=served_model_names,
-                    response_roles=self.response_role,
+                    self.engine,
+                    model_config,
+                    models,
+                    response_role=self.response_role,
                     request_logger=None,
                     chat_template=None,
-                    chat_template_content_format="auto",
+                    chat_template_content_format=None,
                 )
                 logger.info(f"OpenAIServingChat initialized.")
                 
