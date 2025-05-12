@@ -115,7 +115,7 @@ class VLLMDeployment:
             # max_model_len=max_model_len,
             disable_log_requests=True,
             dtype="auto",
-            trust_remote_code=True  # Add this to allow loading custom model code
+            trust_remote_code=True,  # Add this to allow loading custom model code
             limit_mm_per_prompt={"image": 2},  # Allow up to 2 images per prompt
             mm_processor_kwargs={"image_size": 224},  # Adjust based on model's processor
             mm_cache_preprocessor=True,  # Speeds up repeated image processing
