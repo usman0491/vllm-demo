@@ -49,7 +49,6 @@ class LLMEngineActor:
             if not self.openai_serving_chat:
                 logger.info("Initializing OpenAIServingChat...")
                 model_config = await self.engine.get_model_config()
-                served_model_names = [self.engine_args.model]
                 logger.info(f"Model config retrieved: {model_config}")
 
                 class DummyModel:
@@ -117,6 +116,9 @@ class VLLMDeployment:
             disable_log_requests=True,
             dtype="auto",
             trust_remote_code=True  # Add this to allow loading custom model code
+            limit_mm_per_prompt={"image": 2},  # Allow up to 2 images per prompt
+            mm_processor_kwargs={"image_size": 224},  # Adjust based on model's processor
+            mm_cache_preprocessor=True,  # Speeds up repeated image processing
         )
 
         # Start the background monitoring task
