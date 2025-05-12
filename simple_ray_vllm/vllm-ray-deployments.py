@@ -59,7 +59,7 @@ class LLMEngineActor:
                     response_roles=self.response_role,
                     request_logger=None,
                     chat_template=None,
-                    chat_template_contenct_format="auto",
+                    chat_template_content_format="auto",
                 )
                 logger.info(f"OpenAIServingChat initialized.")
                 
