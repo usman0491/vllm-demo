@@ -21,7 +21,7 @@ from vllm.entrypoints.openai.protocol import (
 )
 from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
 
-from vllm.logger import RequestLogger
+# from vllm.logger import RequestLogger
 
 # from vllm.entrypoints.openai.serving_engine import LoRAModulePath
 
@@ -57,7 +57,7 @@ class LLMEngineActor:
                     model_config=model_config,
                     served_model_names=served_model_names,
                     response_roles=self.response_role,
-                    request_logger=RequestLogger(),
+                    request_logger=None,
                     chat_template=None,
                     chat_template_contenct_format="auto",
                 )
