@@ -51,7 +51,7 @@ class LLMEngineActor:
         return port
 
     def _start_container(self):
-        logger.info(f"Starting vLLM container for model: {self.engine_args["model_name"]}")
+        logger.info(f"Starting vLLM container for model: {self.engine_args['model_name']}")
         self.container = self.docker_client.containers.run(
             "vllm/vllm-openai:latest",
             detach=True,
@@ -65,7 +65,7 @@ class LLMEngineActor:
                 "--max-model-len", "8000",
                 "--max-num-seqs", "10"
             ],
-            name=f"vllm-{self.engine_args["model_name"].replace('/', '-')}",
+            name=f"vllm-{self.engine_args['model_name'].replace('/', '-')}",
             remove=True,
         )
         
@@ -90,7 +90,7 @@ class LLMEngineActor:
             return {"error": str(e), "status_code": 500}
         
     def shutdown(self):
-        logger.info("Shutting down container for model {self.engine_args["model_name"]}")
+        logger.info("Shutting down container for model {self.engine_args['model_name']}")
         if self.container:
             self.container.stop()
             self.container = None
