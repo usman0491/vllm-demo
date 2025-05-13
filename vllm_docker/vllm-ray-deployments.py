@@ -42,6 +42,14 @@ class LLMEngineActor:
         self.docker_client = docker.from_env()
         self._start_container()
     
+    def _allocate_port(self):
+        import socket
+        s = socket.socket()
+        s.bind(('', 0))
+        port  = s.getsockname()[1]
+        s.close()
+        return port
+
     def _start_container(self):
         logger.info(f"Starting vLLM container for model: {self.engine_args.model_name}")
         self.container = self.docker_client.containers.run(
@@ -156,7 +164,7 @@ class VLLMDeployment:
         
         self.active_models.add(model_name)
         self.num_models += 1
-        self.engine_args.model = model_name # Update model name in engine_args
+        self.engine_args.model_name = model_name # Update model name in engine_args
         self._update_resource_request()
         
         # Set a placeholder to indicate that the model is being initialized
