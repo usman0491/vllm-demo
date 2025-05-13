@@ -51,7 +51,7 @@ class LLMEngineActor:
         return port
 
     def _start_container(self):
-        logger.info(f"Starting vLLM container for model: {self.engine_args.model_name}")
+        logger.info(f"Starting vLLM container for model: {self.engine_args["model_name"]}")
         self.container = self.docker_client.containers.run(
             "vllm/vllm-openai:latest",
             detach=True,
@@ -60,12 +60,12 @@ class LLMEngineActor:
                 "HUGGING_FACE_HUB_TOKEN": os.getenv("HUGGING_FACE_HUB_TOKEN", "")
             },
             command=[
-                "--model", self.engine_args.model_name,
+                "--model", self.engine_args["model_name"],
                 "--enforce-eager",
                 "--max-model-len", "8000",
                 "--max-num-seqs", "10"
             ],
-            name=f"vllm-{self.engine_args.model_name.replace('/', '-')}",
+            name=f"vllm-{self.engine_args["model_name"].replace('/', '-')}",
             remove=True,
         )
         
@@ -90,7 +90,7 @@ class LLMEngineActor:
             return {"error": str(e), "status_code": 500}
         
     def shutdown(self):
-        logger.info("Shutting down container for model {self.engine_args.model_name}")
+        logger.info("Shutting down container for model {self.engine_args["model_name"]}")
         if self.container:
             self.container.stop()
             self.container = None
@@ -164,7 +164,7 @@ class VLLMDeployment:
         
         self.active_models.add(model_name)
         self.num_models += 1
-        self.engine_args.model_name = model_name # Update model name in engine_args
+        self.engine_args["model_name"] = model_name # Update model name in engine_args
         self._update_resource_request()
         
         # Set a placeholder to indicate that the model is being initialized
