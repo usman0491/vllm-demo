@@ -90,7 +90,7 @@ spec:
                       name: hf-secret
                       key: hf_api_token
     workerGroupSpecs:
-      - replicas: 0
+      - replicas: 1
         minReplicas: 0
         maxReplicas: 2
         # logical group name, for this called small-group, also can be functional
@@ -103,8 +103,19 @@ spec:
               worker: "true"
             containers:
               - name: ray-worker # must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc'
-                image: rayproject/ray-llm:2.43.0-py311-cu124 # rayproject/ray-ml:2.43.0.deprecated-py310-gpu
+                image: vllm/vllm-openai:latest
+                args:
+                  - '--model'
+                  - '$(MODEL_ID)'
+                  - '--gpu-memory-utilization'
+                  - '0.95'
+                  - '--enforce-eager'
+                  - '--max-model-len'
+                  - '8000'
+                  - '--max-num-seqs'
+                  - '10'
                 env:
+                  - MODEL_ID: "meta-llama/Meta-Llama-3-8B-Instruct"
                   - name: HUGGING_FACE_HUB_TOKEN
                     valueFrom:
                       secretKeyRef:
