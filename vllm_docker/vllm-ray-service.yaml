@@ -115,7 +115,8 @@ spec:
                   - '--max-num-seqs'
                   - '10'
                 env:
-                  - MODEL_ID: "meta-llama/Meta-Llama-3-8B-Instruct"
+                  - name: MODEL_ID
+                    value: "meta-llama/Meta-Llama-3-8B-Instruct"
                   - name: HUGGING_FACE_HUB_TOKEN
                     valueFrom:
                       secretKeyRef:
