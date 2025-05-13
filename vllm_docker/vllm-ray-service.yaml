@@ -1,0 +1,129 @@
+apiVersion: ray.io/v1
+kind: RayService
+metadata:
+  name: rayserve-vllm
+  namespace: ray-system
+spec:
+  serviceUnhealthySecondThreshold: 1800 # Config for the health check threshold for service. Default value is 60.
+  deploymentUnhealthySecondThreshold: 1800 # Config for the health check threshold for deployments. Default value is 60.
+  
+  serveConfigV2: |
+    applications:
+    - name: vllm_inference
+      import_path: vllm-ray-deployments:deployment
+      runtime_env:
+        env_vars:
+          RAY_LOG_TO_STDERR: "1"
+          RAY_SERVE_LOGGING_LEVEL: DEBUG
+          # HUGGING_FACE_HUB_TOKEN: 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
+          MODEL_ID: "meta-llama/Meta-Llama-3-8B-Instruct"
+          TENSOR_PARALLELISM: "1"
+          PIPELINE_PARALLELISM: "1"
+          LD_LIBRARY_PATH: "/home/ray/anaconda3/lib:$LD_LIBRARY_PATH"
+          GPU_MEMORY_UTILIZATION: "0.9"
+          MAX_MODEL_LEN: "64000"
+          MAX_NUM_SEQ: "10"
+          MAX_NUM_BATCHED_TOKENS: "32000"
+          VLLM_PORT: "10001"
+        working_dir: "https://github.com/usman0491/vllm-demo/raw/refs/heads/main/simple_ray_vllm/vllm-ray-deployments.zip"
+        pip: ["vllm==0.8.4", "typer==0.12.3", "rich==13.3.3", "jinja2>=3.1.0"] 
+
+      deployments:
+      - name: VLLMDeployment
+        num_replicas: 1
+        # ray_actor_options:
+        #   num_cpus: 1
+      route_prefix: /        
+
+  rayClusterConfig:
+    rayVersion: '2.43.0' # should match the Ray version in the image of the containers
+    ######################headGroupSpecs#################################
+    enableInTreeAutoscaling: true
+    autoscalerOptions:
+      upscalingMode: Default
+      idleTimeoutSeconds: 60
+      
+    headGroupSpec:
+      headService:
+        metadata:
+          name: vllm
+          namespace: ray-system
+    #   serviceType: NodePort
+
+      rayStartParams:
+        dashboard-host: '0.0.0.0'
+        # node-ip-address: '0.0.0.0'
+        num-cpus: "1"
+      #pod template
+      template:
+        spec:
+          nodeSelector:
+            head: "true"
+          containers:
+            - name: ray-head
+              image: rayproject/ray-llm:2.43.0-py311-cu124 # rayproject/ray-ml:2.43.0.deprecated-py310-gpu
+              imagePullPolicy: IfNotPresent
+              lifecycle:
+                preStop:
+                  exec:
+                    command: ["/bin/sh", "-c", "ray stop"]
+              resources:
+                limits:
+                  cpu: 2
+                  memory: 8Gi
+                requests:
+                  cpu: 2
+                  memory: 8Gi
+              ports:
+                - containerPort: 6379
+                  name: gcs-server
+                - containerPort: 8265 # Ray dashboard
+                  name: dashboard
+                - containerPort: 10001
+                  name: client
+                - containerPort: 8000
+                  name: serve
+              env:
+                - name: HUGGING_FACE_HUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: hf-secret
+                      key: hf_api_token
+    workerGroupSpecs:
+      - replicas: 0
+        minReplicas: 0
+        maxReplicas: 2
+        # logical group name, for this called small-group, also can be functional
+        groupName: gpu-group
+
+        rayStartParams: {}
+        template:
+          spec:
+            nodeSelector:
+              worker: "true"
+            containers:
+              - name: ray-worker # must consist of lower case alphanumeric characters or '-', and must start and end with an alphanumeric character (e.g. 'my-name',  or '123-abc'
+                image: rayproject/ray-llm:2.43.0-py311-cu124 # rayproject/ray-ml:2.43.0.deprecated-py310-gpu
+                env:
+                  - name: HUGGING_FACE_HUB_TOKEN
+                    valueFrom:
+                      secretKeyRef:
+                        name: hf-secret
+                        key: hf_api_token
+                lifecycle:
+                  preStop:
+                    exec:
+                      command: ["/bin/sh","-c","ray stop"]
+                resources:
+                  limits:
+                    cpu: "2"
+                    memory: "20Gi"
+                    nvidia.com/gpu: "1"
+                  requests:
+                    cpu: "2"
+                    memory: "20Gi"
+                    nvidia.com/gpu: "1"
+            tolerations:
+              - key: nvidia.com/gpu
+                operator: Exists
+                effect: NoSchedule
