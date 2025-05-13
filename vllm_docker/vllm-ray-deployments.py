@@ -35,65 +35,65 @@ logger = logging.getLogger("ray.serve")
 class LLMEngineActor:
     def __init__(self, engine_args: dict):
         self.engine_args = engine_args
-        self.container = None
-        self.container_port = 8000
-        self.host_port = self._allocate_port()
-        self.base_url = f"http://localhost:{self.host_port}"
-        self.docker_client = docker.from_env()
-        self._start_container()
+        # self.container = None
+        # self.container_port = 8000
+        # self.host_port = self._allocate_port()
+        # self.base_url = f"http://localhost:{self.host_port}"
+        # self.docker_client = docker.from_env()
+        # self._start_container()
     
-    def _allocate_port(self):
-        import socket
-        s = socket.socket()
-        s.bind(('', 0))
-        port  = s.getsockname()[1]
-        s.close()
-        return port
+#     def _allocate_port(self):
+#         import socket
+#         s = socket.socket()
+#         s.bind(('', 0))
+#         port  = s.getsockname()[1]
+#         s.close()
+#         return port
 
-    def _start_container(self):
-        logger.info(f"Starting vLLM container for model: {self.engine_args['model_name']}")
-        self.container = self.docker_client.containers.run(
-            "vllm/vllm-openai:latest",
-            detach=True,
-            ports={f'{self.container_port}/tcp': self.host_port},
-            environment={
-                "HUGGING_FACE_HUB_TOKEN": os.getenv("HUGGING_FACE_HUB_TOKEN", "")
-            },
-            command=[
-                "--model", self.engine_args["model_name"],
-                "--enforce-eager",
-                "--max-model-len", "8000",
-                "--max-num-seqs", "10"
-            ],
-            name=f"vllm-{self.engine_args['model_name'].replace('/', '-')}",
-            remove=True,
-        )
+#     def _start_container(self):
+#         logger.info(f"Starting vLLM container for model: {self.engine_args['model_name']}")
+#         self.container = self.docker_client.containers.run(
+#             "vllm/vllm-openai:latest",
+#             detach=True,
+#             ports={f'{self.container_port}/tcp': self.host_port},
+#             environment={
+#                 "HUGGING_FACE_HUB_TOKEN": os.getenv("HUGGING_FACE_HUB_TOKEN", "")
+#             },
+#             command=[
+#                 "--model", self.engine_args["model_name"],
+#                 "--enforce-eager",
+#                 "--max-model-len", "8000",
+#                 "--max-num-seqs", "10"
+#             ],
+#             name=f"vllm-{self.engine_args['model_name'].replace('/', '-')}",
+#             remove=True,
+#         )
         
 
 
-    async def get_chat_response(self, request_dict: dict):
-        import aiohttp
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.base_url}/v1/chat/completions",
-                    json=request_dict,
-                    headers={"Authorization": f"Bearer {os.getenv('VLLM_API_KEY', '')}"}
-                ) as response:
-                    if response.status != 200:
-                        error = await response.text()
-                        logger.error(f"Error from vLLM container: {error}")
-                        return {"error": error, "status_code": response.status}
-                    return await response.json()
-        except Exception as e:
-            logger.exception("Failed to get chat response")
-            return {"error": str(e), "status_code": 500}
+#     async def get_chat_response(self, request_dict: dict):
+#         import aiohttp
+#         try:
+#             async with aiohttp.ClientSession() as session:
+#                 async with session.post(
+#                     f"{self.base_url}/v1/chat/completions",
+#                     json=request_dict,
+#                     headers={"Authorization": f"Bearer {os.getenv('VLLM_API_KEY', '')}"}
+#                 ) as response:
+#                     if response.status != 200:
+#                         error = await response.text()
+#                         logger.error(f"Error from vLLM container: {error}")
+#                         return {"error": error, "status_code": response.status}
+#                     return await response.json()
+#         except Exception as e:
+#             logger.exception("Failed to get chat response")
+#             return {"error": str(e), "status_code": 500}
         
-    def shutdown(self):
-        logger.info("Shutting down container for model {self.engine_args['model_name']}")
-        if self.container:
-            self.container.stop()
-            self.container = None
+#     def shutdown(self):
+#         logger.info("Shutting down container for model {self.engine_args['model_name']}")
+#         if self.container:
+#             self.container.stop()
+#             self.container = None
 
 
 app = FastAPI()
@@ -144,7 +144,7 @@ class VLLMDeployment:
                 idle_time = time.time() - self.last_request_time.get(model_name, 0)
                 if idle_time > self.shutdown_timeout:
                     logger.info(f"No requests for {model_name} in {self.shutdown_timeout} seconds. Shutting down worker node for {model_name}.")
-                    self.engine_actors[model_name].shutdown.remote()
+                    # self.engine_actors[model_name].shutdown.remote()
                     ray.kill(self.engine_actors[model_name])
                     del self.engine_actors[model_name]
                     self.active_models.discard(model_name)
@@ -221,7 +221,8 @@ class VLLMDeployment:
         self.last_request_time[model_name] = time.time() # Reset the timer on each request
 
         logger.info(f"Sending request to LLMEngineActor: {request.dict()}")
-        response = await self.engine_actors[model_name].get_chat_response.remote(request.dict())
+        # response = await self.engine_actors[model_name].get_chat_response.remote(request.dict())
+        response = None
         logger.info(f"Request to LLMEngineActor completed: {request.dict()}")
 
         # Handle error response
