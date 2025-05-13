@@ -115,7 +115,7 @@ class VLLMDeployment:
         self.last_request_time = {}  # Track last request time per model
         self.shutdown_timeout = 600  # Set timeout (e.g., 30 minutes)
         self.engine_args = dict([
-            ("model", model),
+            ("model_name", model),
             ("tensor_parallel_size", tensor_parallel_size),
             ("pipeline_parallel_size", pipeline_parallel_size),
             ("max_num_seqs", 12),
