@@ -112,7 +112,7 @@ class VLLMDeployment:
             tensor_parallel_size=tensor_parallel_size,
             pipeline_parallel_size=pipeline_parallel_size,
             max_num_seqs=12,
-            max_model_len=4096,
+            max_model_len=64000,
             enforce_eager=True,
             disable_log_requests=True,
             dtype="auto",
