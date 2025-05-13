@@ -21,6 +21,8 @@ from vllm.entrypoints.openai.protocol import (
 )
 from vllm.entrypoints.openai.serving_chat import OpenAIServingChat
 
+import docker
+
 # from vllm.logger import RequestLogger
 
 # from vllm.entrypoints.openai.serving_engine import LoRAModulePath
@@ -31,62 +33,59 @@ logger = logging.getLogger("ray.serve")
 
 @ray.remote(num_gpus=1)  # Ensure it runs on a GPU worker node (num_cpus=1, num_gpus=1)
 class LLMEngineActor:
-    def __init__(self, engine_args: AsyncEngineArgs):
-        logger.info("Initializing LLM Engine on a worker node...")
-        self.openai_serving_chat = None
+    def __init__(self, engine_args: dict):
         self.engine_args = engine_args
-        self.response_role: str = "assistant"
-        self.lora_modules = None # Optional[List[LoRAModulePath]] = None
-        self.chat_template = None
-
-        self.engine = AsyncLLMEngine.from_engine_args(engine_args)
-        logger.info("LLM Engine initialized successfully.")
+        self.container = None
+        self.container_port = 8000
+        self.host_port = self._allocate_port()
+        self.base_url = f"http://localhost:{self.host_port}"
+        self.docker_client = docker.from_env()
+        self._start_container()
+    
+    def _start_container(self):
+        logger.info(f"Starting vLLM container for model: {self.engine_args.model_name}")
+        self.container = self.docker_client.containers.run(
+            "vllm/vllm-openai:latest",
+            detach=True,
+            ports={f'{self.container_port}/tcp': self.host_port},
+            environment={
+                "HUGGING_FACE_HUB_TOKEN": os.getenv("HUGGING_FACE_HUB_TOKEN", "")
+            },
+            command=[
+                "--model", self.engine_args.model_name,
+                "--enforce-eager",
+                "--max-model-len", "8000",
+                "--max-num-seqs", "10"
+            ],
+            name=f"vllm-{self.engine_args.model_name.replace('/', '-')}",
+            remove=True,
+        )
+        
 
 
     async def get_chat_response(self, request_dict: dict):
+        import aiohttp
         try:
-            request = ChatCompletionRequest(**request_dict)
-            if not self.openai_serving_chat:
-                logger.info("Initializing OpenAIServingChat...")
-                model_config = await self.engine.get_model_config()
-                logger.info(f"Model config retrieved: {model_config}")
-
-                class DummyModel:
-                    def __init__(self, name):
-                        self.name = name
-                    def is_base_model(self, *args, **kwargs):
-                        return True
-
-                models = DummyModel(self.engine_args.model)
-
-                self.openai_serving_chat = OpenAIServingChat(
-                    self.engine,
-                    model_config,
-                    models,
-                    self.response_role,
-                    request_logger=None,
-                    chat_template=None,
-                    chat_template_content_format=None,
-                )
-                logger.info(f"OpenAIServingChat initialized.")
-                
-            # Call the chat completion function
-            logger.info("Calling create_chat_completion()...")
-            generator = await self.openai_serving_chat.create_chat_completion(request)
-            logger.info("create_chat_completion() executed successfully.")
-
-            # Handle errors
-            if isinstance(generator, ErrorResponse):
-                logger.warning(f"Error in completion generation: {generator}")
-                return {"error": generator.model_dump(), "status_code": generator.code}
-
-            # Ensure correct response format
-            assert isinstance(generator, ChatCompletionResponse)
-            logger.info(f"Returning JSON response to the client.")
-            return generator.model_dump()
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.base_url}/v1/chat/completions",
+                    json=request_dict,
+                    headers={"Authorization": f"Bearer {os.getenv('VLLM_API_KEY', '')}"}
+                ) as response:
+                    if response.status != 200:
+                        error = await response.text()
+                        logger.error(f"Error from vLLM container: {error}")
+                        return {"error": error, "status_code": response.status}
+                    return await response.json()
         except Exception as e:
-            logger.error(f"Exception in get_chat_response: {e}", exc_info=True)
+            logger.exception("Failed to get chat response")
             return {"error": str(e), "status_code": 500}
+        
+    def shutdown(self):
+        logger.info("Shutting down container for model {self.engine_args.model_name}")
+        if self.container:
+            self.container.stop()
+            self.container = None
 
 
 app = FastAPI()
@@ -107,20 +106,20 @@ class VLLMDeployment:
         self.active_models = set()  # Track the active models names
         self.last_request_time = {}  # Track last request time per model
         self.shutdown_timeout = 600  # Set timeout (e.g., 30 minutes)
-        self.engine_args = AsyncEngineArgs(
-            model=model,
-            tensor_parallel_size=tensor_parallel_size,
-            pipeline_parallel_size=pipeline_parallel_size,
-            max_num_seqs=12,
-            max_model_len=8000,
-            enforce_eager=True,
-            disable_log_requests=True,
-            dtype="auto",
-            trust_remote_code=True,  # Add this to allow loading custom model code
-            # limit_mm_per_prompt={"image": 2},  # Allow up to 2 images per prompt
-            # mm_processor_kwargs={"image_size": 224},  # Adjust based on model's processor
-            # disable_mm_preprocessor_cache=True,  # Speeds up repeated image processing
-        )
+        self.engine_args = dict([
+            ("model", model),
+            ("tensor_parallel_size", tensor_parallel_size),
+            ("pipeline_parallel_size", pipeline_parallel_size),
+            ("max_num_seqs", 12),
+            ("max_model_len", 8000),
+            ("enforce_eager", True),
+            ("disable_log_requests", True),
+            ("dtype", "auto"),
+            ("trust_remote_code", True),
+            # ("limit_mm_per_prompt", {"image": 2}),
+            # ("mm_processor_kwargs", {"image_size": 224}),
+            # ("disable_mm_preprocessor_cache", True),
+        ])
 
         # Start the background monitoring task
         self._start_inactivity_monitor()
@@ -137,6 +136,7 @@ class VLLMDeployment:
                 idle_time = time.time() - self.last_request_time.get(model_name, 0)
                 if idle_time > self.shutdown_timeout:
                     logger.info(f"No requests for {model_name} in {self.shutdown_timeout} seconds. Shutting down worker node for {model_name}.")
+                    self.engine_actors[model_name].shutdown.remote()
                     ray.kill(self.engine_actors[model_name])
                     del self.engine_actors[model_name]
                     self.active_models.discard(model_name)
@@ -157,7 +157,6 @@ class VLLMDeployment:
         self.active_models.add(model_name)
         self.num_models += 1
         self.engine_args.model = model_name # Update model name in engine_args
-        self.engine_args.trust_remote_code = True
         self._update_resource_request()
         
         # Set a placeholder to indicate that the model is being initialized
