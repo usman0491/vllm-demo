@@ -93,6 +93,8 @@ spec:
       - replicas: 0
         minReplicas: 0
         maxReplicas: 2
+        worker_setup_commands:
+          - pip install ray=='2.43.0'
         # logical group name, for this called small-group, also can be functional
         groupName: gpu-group
 
