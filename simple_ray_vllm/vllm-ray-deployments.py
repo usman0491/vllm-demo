@@ -186,6 +186,7 @@ class VLLMDeployment:
         "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
         "meta-llama/Llama-3.2-11B-Vision-Instruct",
         "meta-llama/Llama-Guard-3-11B-Vision",
+        "Qwen/Qwen3-8B",
         "vectara/hallucination_evaluation_model"
     }
 
