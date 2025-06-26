@@ -145,7 +145,7 @@ class VLLMDeployment:
                     logger.info(f"Worker node for {model_name} shut down successfully.")
 
     def _update_resource_request(self):
-        request_resources(bundles=[{"CPU": 2, "GPU": 2}] * self.num_models)
+        request_resources(bundles=[{"CPU": 2, "GPU": 1}] * self.num_models)
 
     async def _ensure_engine_actor(self, model_name: str):
         if model_name in self.engine_actors:
@@ -240,7 +240,7 @@ class VLLMDeployment:
 
 deployment = VLLMDeployment.bind(
     model=os.environ.get('MODEL_ID', 'default-model-id'),
-    tensor_parallel_size=int(os.environ.get('TENSOR_PARALLELISM', '1')),
+    tensor_parallel_size=int(os.environ.get('TENSOR_PARALLELISM', '2')),
     pipeline_parallel_size=int(os.environ.get('PIPELINE_PARALLELISM', '1')),
     max_num_seqs=int(os.environ.get('MAX_NUM_SEQS', '10')),
     max_model_len=int(os.environ.get('MAX_MODEL_LEN', '64000')),
