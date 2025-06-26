@@ -145,7 +145,7 @@ class VLLMDeployment:
                     logger.info(f"Worker node for {model_name} shut down successfully.")
 
     def _update_resource_request(self):
-        request_resources(bundles=[{"CPU": 2, "GPU": 1}] * self.num_models)
+        request_resources(bundles=[{"CPU": 2, "GPU": 1}] * self.num_models * 2)  
 
     async def _ensure_engine_actor(self, model_name: str):
         if model_name in self.engine_actors:
@@ -169,7 +169,7 @@ class VLLMDeployment:
         logger.info(f"Waiting for worker node to become available for model {model_name}...")
         while True:
             resources = ray.cluster_resources()
-            if resources.get("GPU", 0) >= self.num_models:
+            if resources.get("GPU", 0) >= (self.num_models * 2):
                 logger.info(f"Worker node detected for model {model_name}. Initializing engine...")
                 self.engine_actors[model_name] = LLMEngineActor.options(
                     name=f"llm_actor_{model_name}", scheduling_strategy="SPREAD", lifetime="detached"

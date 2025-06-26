@@ -15,7 +15,7 @@ spec:
         env_vars:
           RAY_LOG_TO_STDERR: "1"
           RAY_SERVE_LOGGING_LEVEL: DEBUG
-          # HUGGING_FACE_HUB_TOKEN: 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
+          # HUGGING_FACE_HUB_TOKEN: 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
           MODEL_ID: "meta-llama/Meta-Llama-3-8B-Instruct"
           TENSOR_PARALLELISM: "2"
           PIPELINE_PARALLELISM: "1"
