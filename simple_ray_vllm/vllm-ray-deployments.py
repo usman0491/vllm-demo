@@ -182,7 +182,7 @@ class VLLMDeployment:
 
     allowed_models = {
         # "meta-llama/Meta-Llama-3-8B",
-        "meta-llama/Meta-Llama-3-8B-Instruct"
+        "meta-llama/Meta-Llama-3-8B-Instruct",
         "meta-llama/Llama-4-Scout-17B-16E-Instruct"
         # "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
         # "meta-llama/Llama-3.2-11B-Vision-Instruct",
