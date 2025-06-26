@@ -111,9 +111,9 @@ class VLLMDeployment:
             model=model,
             tensor_parallel_size=tensor_parallel_size,
             pipeline_parallel_size=pipeline_parallel_size,
-            max_num_seqs=12,
-            max_model_len=8000,
-            enforce_eager=True,
+            # max_num_seqs=12,
+            # max_model_len=8000,
+            # enforce_eager=True,
             disable_log_requests=True,
             dtype="auto",
             trust_remote_code=True,  # Add this to allow loading custom model code
@@ -145,7 +145,7 @@ class VLLMDeployment:
                     logger.info(f"Worker node for {model_name} shut down successfully.")
 
     def _update_resource_request(self):
-        request_resources(bundles=[{"CPU": 2, "GPU": 1}] * self.num_models)
+        request_resources(bundles=[{"CPU": 2, "GPU": 2}] * self.num_models)
 
     async def _ensure_engine_actor(self, model_name: str):
         if model_name in self.engine_actors:
