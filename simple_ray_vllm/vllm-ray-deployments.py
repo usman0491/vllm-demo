@@ -172,7 +172,7 @@ class VLLMDeployment:
             if resources.get("GPU", 0) >= (self.num_models * 2):
                 logger.info(f"Worker node detected for model {model_name}. Initializing engine...")
                 self.engine_actors[model_name] = LLMEngineActor.options(
-                    name=f"llm_actor_{model_name}", scheduling_strategy="SPREAD"# , lifetime="detached"
+                    name=f"llm_actor_{model_name}"#, scheduling_strategy="SPREAD" , lifetime="detached"
                 ).remote(self.engine_args)
                 logger.info(f"AsyncLLMEngine for {model_name} initialized successfully.")
                 break
