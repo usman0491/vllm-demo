@@ -29,7 +29,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")
 
 
-@ray.remote(num_gpus=1)  # Ensure it runs on a GPU worker node (num_cpus=1, num_gpus=1)
+@ray.remote(num_gpus=2)  # Ensure it runs on a GPU worker node (num_cpus=1, num_gpus=1)
 class LLMEngineActor:
     def __init__(self, engine_args: AsyncEngineArgs):
         logger.info("Initializing LLM Engine on a worker node...")
@@ -172,7 +172,7 @@ class VLLMDeployment:
             if resources.get("GPU", 0) >= (self.num_models * 2):
                 logger.info(f"Worker node detected for model {model_name}. Initializing engine...")
                 self.engine_actors[model_name] = LLMEngineActor.options(
-                    name=f"llm_actor_{model_name}", scheduling_strategy="SPREAD", lifetime="detached"
+                    name=f"llm_actor_{model_name}", scheduling_strategy="SPREAD"# , lifetime="detached"
                 ).remote(self.engine_args)
                 logger.info(f"AsyncLLMEngine for {model_name} initialized successfully.")
                 break
