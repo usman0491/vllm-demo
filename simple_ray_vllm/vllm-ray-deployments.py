@@ -240,7 +240,7 @@ class VLLMDeployment:
 
 deployment = VLLMDeployment.bind(
     model=os.environ.get('MODEL_ID', 'default-model-id'),
-    tensor_parallel_size=int(os.environ.get('TENSOR_PARALLELISM', '2')),
+    tensor_parallel_size=int(os.environ.get('TENSOR_PARALLELISM', '1')),
     pipeline_parallel_size=int(os.environ.get('PIPELINE_PARALLELISM', '1')),
     max_num_seqs=int(os.environ.get('MAX_NUM_SEQS', '10')),
     max_model_len=int(os.environ.get('MAX_MODEL_LEN', '64000')),
