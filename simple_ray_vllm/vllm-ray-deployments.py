@@ -29,7 +29,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ray.serve")
 
 
-@ray.remote(num_gpus=2)  # Ensure it runs on a GPU worker node (num_cpus=1, num_gpus=1)
+@ray.remote(num_gpus=1)  # Ensure it runs on a GPU worker node (num_cpus=1, num_gpus=1)
 class LLMEngineActor:
     def __init__(self, engine_args: AsyncEngineArgs):
         logger.info("Initializing LLM Engine on a worker node...")
@@ -145,7 +145,7 @@ class VLLMDeployment:
                     logger.info(f"Worker node for {model_name} shut down successfully.")
 
     def _update_resource_request(self):
-        request_resources(bundles=[{"CPU": 2, "GPU": 1}] * self.num_models * 2)  
+        request_resources(bundles=[{"CPU": 2, "GPU": 1}] * self.num_models * 1)  
 
     async def _ensure_engine_actor(self, model_name: str):
         if model_name in self.engine_actors:
@@ -169,10 +169,10 @@ class VLLMDeployment:
         logger.info(f"Waiting for worker node to become available for model {model_name}...")
         while True:
             resources = ray.cluster_resources()
-            if resources.get("GPU", 0) >= (self.num_models * 2):
+            if resources.get("GPU", 0) >= (self.num_models * 1):
                 logger.info(f"Worker node detected for model {model_name}. Initializing engine...")
                 self.engine_actors[model_name] = LLMEngineActor.options(
-                    name=f"llm_actor_{model_name}"#, scheduling_strategy="SPREAD" , lifetime="detached"
+                    name=f"llm_actor_{model_name}", scheduling_strategy="SPREAD" , lifetime="detached"
                 ).remote(self.engine_args)
                 logger.info(f"AsyncLLMEngine for {model_name} initialized successfully.")
                 break
@@ -181,14 +181,14 @@ class VLLMDeployment:
                 await asyncio.sleep(10)
 
     allowed_models = {
-        # "meta-llama/Meta-Llama-3-8B",
+        "meta-llama/Meta-Llama-3-8B",
         "meta-llama/Meta-Llama-3-8B-Instruct",
         "meta-llama/Llama-4-Scout-17B-16E-Instruct"
-        # "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
-        # "meta-llama/Llama-3.2-11B-Vision-Instruct",
-        # "meta-llama/Llama-Guard-3-11B-Vision",
-        # "Qwen/Qwen3-8B",
-        # "vectara/hallucination_evaluation_model"
+        "deepseek-ai/DeepSeek-R1-Distill-Llama-8B",
+        "meta-llama/Llama-3.2-11B-Vision-Instruct",
+        "meta-llama/Llama-Guard-3-11B-Vision",
+        "Qwen/Qwen3-8B",
+        "vectara/hallucination_evaluation_model"
     }
 
     @app.post("/v1/completions")
