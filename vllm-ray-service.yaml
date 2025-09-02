@@ -27,7 +27,6 @@ spec:
         env_vars:
           RAY_LOG_TO_STDERR: "1"
           RAY_SERVE_LOGGING_LEVEL: DEBUG
-          HUGGING_FACE_HUB_TOKEN: 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
           MODEL_ID: "meta-llama/Meta-Llama-3-8B-Instruct"
           MM_MODELS: "meta-llama/Llama-3.2-11B-Vision-Instruct"
           TENSOR_PARALLELISM: "1"
@@ -96,7 +95,7 @@ spec:
       # the pod replicas in this group typed worker
       - replicas: 0
         minReplicas: 0
-        maxReplicas: 2
+        maxReplicas: 1
         # logical group name, for this called small-group, also can be functional
         groupName: vllm-group
         # The `rayStartParams` are used to configure the `ray start` command.
